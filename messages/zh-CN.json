@@ -1,0 +1,359 @@
+{
+    "nav": {
+        "home": "主页",
+        "dashboard": "仪表板",
+        "admin": "管理",
+        "labs": "实验室",
+        "users": "用户",
+        "templates": "模板",
+        "aiPrompts": "AI提示词",
+        "audit": "审计",
+        "products": "产品",
+        "dossiers": "档案",
+        "extraDocs": "其他文档",
+        "labUsers": "实验室用户",
+        "reports": "报告",
+        "assignedLabs": "分配的实验室",
+        "reviewQueue": "审查队列",
+        "review": "审查",
+        "config": "配置",
+        "settings": "设置"
+    },
+    "auth": {
+        "login": "登录",
+        "logout": "登出",
+        "email": "电子邮件",
+        "password": "密码",
+        "welcome": "欢迎使用ARCSAPP",
+        "description": "用于ARCSA药品卫生注册申请文件控制和合规管理的监管管理应用程序。"
+    },
+    "roles": {
+        "super_admin": "超级管理员",
+        "lab_admin": "实验室管理员",
+        "lab_uploader": "文档上传者",
+        "lab_viewer": "查看者",
+        "reviewer": "外部审查员"
+    },
+    "status": {
+        "pending": "待处理",
+        "uploaded": "已上传",
+        "in_review": "审查中",
+        "approved": "已批准",
+        "observed": "已观察",
+        "active": "活跃",
+        "inactive": "不活跃",
+        "draft": "草稿",
+        "in_progress": "进行中",
+        "ready": "就绪",
+        "submitted": "已提交"
+    },
+    "config": {
+        "title": "系统配置",
+        "labs": {
+            "title": "实验室",
+            "description": "管理公司和实验室",
+            "create": "创建实验室",
+            "edit": "编辑实验室",
+            "name": "实验室名称",
+            "ruc": "税号",
+            "status": "状态"
+        },
+        "users": {
+            "title": "用户",
+            "description": "管理用户和角色",
+            "create": "创建用户",
+            "edit": "编辑用户",
+            "fullName": "全名",
+            "email": "电子邮件",
+            "password": "密码",
+            "locale": "首选语言",
+            "assignLab": "分配到实验室",
+            "role": "角色"
+        },
+        "templates": {
+            "title": "检查清单模板",
+            "description": "按产品类型管理模板",
+            "create": "创建模板",
+            "edit": "编辑模板"
+        }
+    },
+    "products": {
+        "title": "产品",
+        "create": "创建产品",
+        "edit": "编辑产品",
+        "list": "产品列表",
+        "nombreComercial": "商品名称",
+        "principioActivo": "活性成分",
+        "formaFarmaceutica": "药物形式",
+        "concentracion": "浓度",
+        "viaAdministracion": "给药途径",
+        "presentacion": "规格",
+        "fabricante": "制造商",
+        "titular": "持有人",
+        "paisOrigen": "原产国",
+        "selectProduct": "选择产品"
+    },
+    "dossiers": {
+        "title": "监管档案",
+        "create": "创建档案",
+        "productName": "产品名称",
+        "productType": "产品类型",
+        "origin": "来源",
+        "progress": "进度",
+        "progressUpload": "已上传文档",
+        "progressApproval": "审查员已批准",
+        "uploaded": "已上传",
+        "approved": "已批准",
+        "ready": "就绪",
+        "notReady": "未就绪",
+        "checklist": "检查清单",
+        "extraDocs": "额外文档",
+        "activity": "活动",
+        "modules": {
+            "legal": "法律",
+            "quality": "质量",
+            "efficacy": "疗效",
+            "general": "一般",
+            "administrativo": "行政",
+            "técnico": "技术",
+            "calidad": "质量",
+            "fabricante": "制造商",
+            "otros": "其他"
+        },
+        "items": "{count} 项",
+        "detail": {
+            "viewEvaluationCriteria": "查看评估标准",
+            "blockA": "区块 A — 档案",
+            "blockB": "区块 B — 状态",
+            "blockC": "区块 C — 管理员分析",
+            "blockD": "区块 D — 技术裁决",
+            "version": "版本",
+            "view": "查看",
+            "download": "下载",
+            "replace": "替换",
+            "approved": "已批准",
+            "observed": "已观察",
+            "rejected": "已拒绝",
+            "officialVerdict": "官方技术裁决",
+            "valid": "有效",
+            "reviewRequired": "需要审查",
+            "detectedType": "检测到的类型",
+            "viewFullAnalysis": "查看完整分析",
+            "reanalyze": "重新分析",
+            "runAnalysis": "运行分析",
+            "pendingAdminReview": "待管理员审核",
+            "newVerdict": "新裁决",
+            "approve": "批准",
+            "observe": "观察",
+            "saveVerdict": "保存裁决",
+            "savingTranslating": "正在保存和翻译...",
+            "autoTranslated": "自动翻译为 ES/EN/HI/ZH",
+            "noComments": "无评论",
+            "observations": "观察",
+            "alerts": "警报",
+            "mainConclusion": "主要结论",
+            "writeObservations": "写入强制性观察...",
+            "pendingReview": "待技术/化学审查",
+            "pendingCorrection": "待实验室更正"
+        }
+    },
+    "productTypes": {
+        "medicine_general": "一般药物",
+        "biologic": "生物制品",
+        "device_medical": "医疗器械"
+    },
+    "origin": {
+        "imported": "进口",
+        "national": "国产"
+    },
+    "documents": {
+        "upload": "上传文档 (PDF/Word)",
+        "download": "下载",
+        "delete": "删除",
+        "version": "版本",
+        "uploadedBy": "上传者",
+        "uploadedAt": "上传日期",
+        "maxSize": "最大大小: {size}MB"
+    },
+    "ai": {
+        "pendingAdmin": "待管理员审核",
+        "analyze": "AI分析",
+        "analyzing": "分析中...",
+        "provider": "提供者",
+        "results": "分析结果",
+        "risk": "风险等级",
+        "confidence": "置信度",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+    },
+    "review": {
+        "title": "文档审查",
+        "approve": "批准",
+        "observe": "观察",
+        "comment": "评论",
+        "commentRequired": "观察时需要评论",
+        "labs": "分配的实验室",
+        "queue": "审查队列"
+    },
+    "stageInstructions": {
+        "A-01": {
+            "title": "GMP证书",
+            "hint": "上传当前的良好生产规范证书。如适用，可包括附件。",
+            "multiHint": "您可以上传：主GMP证书 + 附件或额外范围",
+            "evaluates": " 评估内容：\n• 证书有效性（未过期）\n• 认可的卫生主管部门\n• 涵盖的剂型\n• 生产商和地址匹配\n• 附件一致性"
+        },
+        "A-02": {
+            "title": "CPP / 自由销售证书",
+            "hint": "上传原产国的药品证书（WHO）或自由销售证书。",
+            "evaluates": " 评估内容：\n• 证书有效性\n• 具体产品名称\n• 原产国和发证机构\n• 上市状态"
+        },
+        "A-03": {
+            "title": "持有人声明",
+            "hint": "上传关于产品国际监管状态的签名声明。",
+            "evaluates": " 评估内容：\n• 法定代表人签名\n• 注册/拒绝/撤回的国家\n• 撤回原因（如适用）\n• 国际安全警报"
+        },
+        "A-04": {
+            "title": "法律授权书",
+            "hint": "上传授权在ARCSA厄瓜多尔办理手续的公证授权书。",
+            "evaluates": " 评估内容：\n• 有效的公证授权书\n• 明确授权ARCSA\n• 授权有效期\n• 法定代表人身份"
+        },
+        "B-01": {
+            "title": "开发与生产",
+            "hint": "包含产品开发文件的文件夹。可上传多个文件。",
+            "multiHint": "📁 此文件夹包含：\n• B-01.1 产品描述\n• B-01.2 生产工艺\n• B-01.3 定性定量配方\n• B-01.4 过程控制（IPC）\n• B-01.5 工艺流程图\n• B-01.6 超量/损耗",
+            "evaluates": "🔍 评估内容：\n• 完整的开发文档\n• 子文档之间的一致性\n• 工艺可追溯性"
+        },
+        "B-01-1": {
+            "title": "产品描述",
+            "hint": "成品的物理、化学和药学描述。",
+            "evaluates": "🔍 评估内容：\n• 物理描述（颜色、形状、气味）\n• 化学特性\n• 药学性质"
+        },
+        "B-01-2": {
+            "title": "生产工艺",
+            "hint": "详细的逐步生产工艺描述。",
+            "evaluates": "🔍 评估内容：\n• 完整的操作顺序\n• 关键参数（时间、温度）\n• 使用的设备"
+        },
+        "B-01-3": {
+            "title": "定性定量配方",
+            "hint": "包含每种活性成分和赋形剂数量的完整组成。",
+            "evaluates": "🔍 评估内容：\n• 所有API及精确数量\n• 所有赋形剂及功能\n• 着色剂和防腐剂"
+        },
+        "B-01-4": {
+            "title": "过程控制（IPC）",
+            "hint": "生产过程中的控制参数和限值。",
+            "evaluates": "🔍 评估内容：\n• 已定义的控制点\n• 接受限值\n• 取样频率"
+        },
+        "B-01-5": {
+            "title": "工艺流程图",
+            "hint": "生产工艺流程的可视化图表。",
+            "evaluates": "🔍 评估内容：\n• 清晰的可视化表示\n• 包含所有阶段\n• 标记控制点"
+        },
+        "B-01-6": {
+            "title": "超量/损耗",
+            "hint": "超量投料或工艺损耗补偿的说明。",
+            "evaluates": "🔍 评估内容：\n• 超量的技术理由\n• 补偿计算"
+        },
+        "B-02": {
+            "title": "原材料 / API CoA",
+            "hint": "为每种原材料上传一个文件。",
+            "multiHint": " 必须包括：\n• 每种API 1份CoA\n• 每种声明的着色剂1份CoA\n• 每种声明的防腐剂1份CoA\n• 关键辅料的CoA（可选）",
+            "evaluates": " 评估内容：\n• B-04中每个API的CoA\n• B-06中每种着色剂的CoA\n• 每种防腐剂的CoA\n• 生产商/供应商标识\n• 规格符合性\n• 分析有效性"
+        },
+        "B-03": {
+            "title": "质量规格",
+            "hint": "上传成品规格，包含每个参数的限值。",
+            "evaluates": " 评估内容：\n• 每个API的参数\n• 与B-04一致的含量限度\n• 按剂型的物理参数\n• 杂质/降解物限度\n• 药典参考"
+        },
+        "B-04": {
+            "title": "定性定量配方",
+            "hint": "上传包含所有API、辅料、着色剂和防腐剂的完整配方。",
+            "evaluates": " 评估内容：\n• API完整清单及含量\n• 等价物（盐/水合物）\n• 辅料及其功能\n• 着色剂和防腐剂\n• 与B-02和B-06一致性"
+        },
+        "B-05": {
+            "title": "配方论证",
+            "hint": "上传每种辅料和组合（如适用）的论证。",
+            "evaluates": " 评估内容：\n• 每种辅料的论证\n• 组合论证（FDC）\n• 剂型论证\n• 参考文献"
+        },
+        "B-06": {
+            "title": "辅料声明",
+            "hint": "上传允许的辅料、着色剂和防腐剂声明。",
+            "evaluates": " 评估内容：\n• 辅料清单及功能\n• 法规允许的着色剂\n• 防腐剂及论证\n• 与B-04一致性"
+        },
+        "B-07": {
+            "title": "生产工艺",
+            "hint": "上传生产工艺描述。",
+            "multiHint": "可包括：\n• 叙述性工艺描述\n• 相关SOPs（制粒、混合等）",
+            "evaluates": " 评估内容：\n• 关键步骤识别\n• 工艺参数（温度、时间）\n• 过程控制\n• 与B-08一致性"
+        },
+        "B-08": {
+            "title": "工艺流程图",
+            "hint": "上传生产工艺流程图。",
+            "multiHint": "可包括：\n• 总体流程图\n• 按区域的流程图（称量、生产、包装）",
+            "evaluates": " 评估内容：\n• 清晰完整的流程图\n• 与B-07一致性\n• 控制点识别\n• 输入/输出物料"
+        },
+        "B-09": {
+            "title": "分析方法",
+            "hint": "上传分析方法和验证报告。",
+            "multiHint": " 每个API必须包括：\n• 鉴别方法\n• 含量测定方法\n• 杂质方法（如适用）\n• 验证报告",
+            "evaluates": " 评估内容：\n• 每个API的鉴别+含量测定方法\n• 分析技术（HPLC、UV等）\n• 验证状态\n• 参数：准确度、精密度、线性\n• 与B-01和B-03一致性"
+        },
+        "B-10": {
+            "title": "批号",
+            "hint": "上传批号编号和结构的SOP。",
+            "evaluates": " 评估内容：\n• 批号结构说明\n• 可追溯性保证\n• 与其他文件中批号一致性"
+        },
+        "B-11": {
+            "title": "一级/二级包装",
+            "hint": "上传包装材料的描述和规格。",
+            "evaluates": " 评估内容：\n• 包装材料描述\n• 材料规格\n• 与产品相容性\n• 与C-01（稳定性）一致性"
+        },
+        "C-01": {
+            "title": "稳定性研究",
+            "hint": "上传产品稳定性研究。",
+            "multiHint": " 必须包括：\n• 加速稳定性（最低要求）\n• 长期稳定性（推荐）\n• 每个批次/条件一个文件\n• 每个API单独评估",
+            "evaluates": " 评估内容：\n• 类型：加速/长期\n• 条件（温度、湿度）\n• 每个时间点每个API的评估\n• 与B-01一致的批次\n• C-02的有效期支持\n• 趋势和结果"
+        },
+        "C-02": {
+            "title": "方案和有效期",
+            "hint": "上传稳定性方案和建议的有效期结论。",
+            "evaluates": " 评估内容：\n• 定义的方案\n• C-01证明的有效期\n• 储存条件\n• 与标签C-05一致性"
+        },
+        "C-03": {
+            "title": "色谱图 / 记录",
+            "hint": "上传色谱图和分析记录。",
+            "multiHint": " 必须包括：\n• 每个API的含量色谱图\n• 杂质色谱图\n• 溶出度记录（如适用）\n• 每种分析类型一个文件",
+            "evaluates": " 评估内容：\n• 每个API的色谱图\n• 与B-09一致的方法\n• 可追溯到B-01和C-01的批次\n• 分析日期\n• 积分和结果"
+        },
+        "C-04": {
+            "title": "临床/药理学支持",
+            "hint": "上传产品的参考文献和疗效支持。",
+            "evaluates": " 评估内容：\n• 支持性参考文献\n• 疗效论证\n• 组合论证（FDC）\n• 官方指南参考"
+        },
+        "C-05": {
+            "title": "标签",
+            "hint": "上传所有产品标签。",
+            "multiHint": " 必须包括：\n• 一级标签（直接容器）\n• 二级标签（盒/纸箱）\n• 包装说明书或传单\n• 每种商业规格一个",
+            "evaluates": " 评估内容：\n• 一级+二级+说明书齐全\n• 成分 = B-04\n• 有效期 = C-02\n• 储存条件 = C-01\n• 生产商 = A-01\n• 所有规格覆盖"
+        }
+    },
+    "common": {
+        "save": "保存",
+        "cancel": "取消",
+        "edit": "编辑",
+        "delete": "删除",
+        "create": "创建",
+        "search": "搜索",
+        "filter": "筛选",
+        "actions": "操作",
+        "required": "必需",
+        "critical": "关键",
+        "optional": "可选",
+        "loading": "加载中...",
+        "error": "错误",
+        "success": "成功",
+        "confirm": "确认",
+        "yes": "是",
+        "no": "否"
+    }
+}

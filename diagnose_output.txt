@@ -1,0 +1,2 @@
+--- DIAGNÓSTICO DE DOSSIER ---
+❌ Error Dossier: Invalid API key
