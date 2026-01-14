@@ -8,6 +8,7 @@
         "templates": "Templates",
         "aiPrompts": "AI Prompts",
         "audit": "Audit",
+        "auditoria": "Doc Audit",
         "products": "Products",
         "dossiers": "Dossiers",
         "extraDocs": "Other Documents",
@@ -102,8 +103,10 @@
         "progress": "Progress",
         "progressUpload": "Documents Uploaded",
         "progressApproval": "Approved by Reviewer",
+        "progressObserved": "Observed",
         "uploaded": "uploaded",
         "approved": "approved",
+        "observed": "observed",
         "ready": "Ready",
         "notReady": "Not Ready",
         "checklist": "Checklist",
@@ -113,6 +116,8 @@
             "legal": "Legal",
             "quality": "Quality",
             "efficacy": "Efficacy",
+            "eficacia": "Efficacy",
+            "etiquetado": "Labeling",
             "general": "General",
             "administrativo": "Administrative",
             "técnico": "Technical",
@@ -160,7 +165,8 @@
     "productTypes": {
         "medicine_general": "General Medicine",
         "biologic": "Biologic",
-        "device_medical": "Medical Device"
+        "device_medical": "Medical Device",
+        "supplement_food": "Food Supplement"
     },
     "origin": {
         "imported": "Imported",
@@ -174,6 +180,25 @@
         "uploadedBy": "Uploaded by",
         "uploadedAt": "Upload Date",
         "maxSize": "Maximum size: {size}MB"
+    },
+    "audit": {
+        "previousAudit": "Previous Product Audit",
+        "viewDetail": "View Detail",
+        "hideDetail": "Hide Detail",
+        "stagesIdentified": "Stages Identified",
+        "problemsDetected": "Problems Detected",
+        "missingDocuments": "Missing Documents",
+        "analysisSummary": "Analysis Summary",
+        "criticalProblems": "Critical Problems",
+        "complete": "Complete",
+        "incomplete": "Incomplete",
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Info",
+        "pages": "Pages",
+        "page": "Pg.",
+        "recommendation": "Recommendation",
+        "andMore": "and {count} more (view detail)"
     },
     "ai": {
         "pendingAdmin": "Pending Administrator Review",
@@ -226,86 +251,53 @@
     "stageInstructions": {
         "A-01": {
             "title": "GMP Certificate",
-            "hint": "Upload the current Good Manufacturing Practices certificate. May include annexes if applicable.",
-            "multiHint": "You can upload: Main GMP certificate + Annexes or additional scopes",
-            "evaluates": " EVALUATED:\n• Certificate validity (not expired)\n• Recognized issuing health authority\n• Pharmaceutical forms covered\n• Manufacturer and address match\n• Annexes consistency"
+            "hint": "Upload the current Good Manufacturing Practices certificate.",
+            "evaluates": "Certificate validity, issuing authority, pharmaceutical forms covered"
         },
         "A-02": {
             "title": "CPP / Free Sale Certificate",
-            "hint": "Upload the Certificate of Pharmaceutical Product (WHO) or Free Sale Certificate from country of origin.",
-            "evaluates": " EVALUATED:\n• Certificate validity\n• Specific product mentioned\n• Country of origin and issuing authority\n• Marketing status"
+            "hint": "Upload the Certificate of Pharmaceutical Product or Free Sale Certificate.",
+            "evaluates": "Certificate validity, product mentioned, country of origin"
         },
         "A-03": {
             "title": "Holder Declaration",
-            "hint": "Upload the signed declaration about the international regulatory status of the product.",
-            "evaluates": " EVALUATED:\n• Legal representative signature\n• Countries where registered/rejected/withdrawn\n• Withdrawal reasons (if applicable)\n• International safety alerts"
+            "hint": "Upload the signed declaration about international regulatory status.",
+            "evaluates": "Legal representative signature, registration status"
         },
         "A-04": {
             "title": "Legal Power of Attorney",
-            "hint": "Upload the notarized power of attorney authorizing procedures before ARCSA Ecuador.",
-            "evaluates": " EVALUATED:\n• Valid notarized power\n• Explicit authorization for ARCSA\n• Power validity\n• Legal representative identification"
+            "hint": "Upload the notarized power of attorney for ARCSA Ecuador.",
+            "evaluates": "Valid notarized power, explicit authorization"
         },
         "B-01": {
             "title": "Development & Manufacturing",
-            "hint": "Folder with product development documents. You can upload multiple files.",
-            "multiHint": "📁 This folder contains:\n• B-01.1 Product Description\n• B-01.2 Manufacturing Process\n• B-01.3 Quali-Quantitative Formula\n• B-01.4 In-Process Controls (IPC)\n• B-01.5 Process Flowchart\n• B-01.6 Overages / Losses",
-            "evaluates": "🔍 EVALUATED:\n• Complete development documentation\n• Consistency between sub-documents\n• Process traceability"
-        },
-        "B-01-1": {
-            "title": "Product Description",
-            "hint": "Physical, chemical and pharmaceutical description of the finished product.",
-            "evaluates": "🔍 EVALUATED:\n• Physical description (color, shape, odor)\n• Chemical characteristics\n• Pharmaceutical properties"
-        },
-        "B-01-2": {
-            "title": "Manufacturing Process",
-            "hint": "Detailed step-by-step manufacturing process description.",
-            "evaluates": "🔍 EVALUATED:\n• Complete sequence of operations\n• Critical parameters (time, temperature)\n• Equipment used"
-        },
-        "B-01-3": {
-            "title": "Quali-Quantitative Formula",
-            "hint": "Complete composition with quantities of each active ingredient and excipient.",
-            "evaluates": "🔍 EVALUATED:\n• All APIs with exact quantities\n• All excipients with function\n• Colorants and preservatives"
-        },
-        "B-01-4": {
-            "title": "In-Process Controls (IPC)",
-            "hint": "Control parameters and limits during the manufacturing process.",
-            "evaluates": "🔍 EVALUATED:\n• Control points defined\n• Acceptance limits\n• Sampling frequency"
-        },
-        "B-01-5": {
-            "title": "Process Flowchart",
-            "hint": "Visual diagram of the manufacturing process flow.",
-            "evaluates": "🔍 EVALUATED:\n• Clear visual representation\n• All stages included\n• Control points marked"
-        },
-        "B-01-6": {
-            "title": "Overages / Losses",
-            "hint": "Justification for overdosing or compensation for process losses.",
-            "evaluates": "🔍 EVALUATED:\n• Technical justification for overage\n• Compensation calculations"
+            "hint": "Upload product development documents (single or multiple files). Must contain: Product Description, Manufacturing Process, Formula, IPC, Flowchart, Overages.",
+            "evaluates": "Product description, manufacturing process, formula, IPC, flowchart, overages, overall consistency"
         },
         "B-02": {
             "title": "Raw Materials / API CoA",
             "hint": "Upload ONE file for EACH raw material.",
-            "multiHint": "Must include:\n• 1 CoA for each Active Pharmaceutical Ingredient (API)\n• 1 CoA for each declared Colorant\n• 1 CoA for each declared Preservative\n• CoA for critical excipients (optional)",
-            "evaluates": " EVALUATED:\n• CoA present for EACH API from B-04\n• CoA for each colorant from B-06\n• CoA for each preservative\n• Manufacturer/supplier identified\n• Specifications compliance\n• Analysis validity"
+            "evaluates": "CoA for each API, manufacturer identified"
         },
         "B-03": {
             "title": "Quality Specifications",
-            "hint": "Upload the finished product specifications with limits for each parameter.",
-            "evaluates": " EVALUATED:\n• Parameters for EACH API\n• Assay limits consistent with B-04\n• Physical parameters per dosage form\n• Impurity/degradant limits\n• Pharmacopoeia reference"
+            "hint": "Upload finished product specifications.",
+            "evaluates": "Parameters for each API, assay limits"
         },
         "B-04": {
             "title": "Qualitative-Quantitative Formula",
-            "hint": "Upload the complete formula with all APIs, excipients, colorants and preservatives.",
-            "evaluates": " EVALUATED:\n• Complete list of APIs with quantities\n• Equivalences (salts/hydrates)\n• Excipients with declared function\n• Colorants and preservatives\n• Consistency with B-02 and B-06"
+            "hint": "Upload complete formula with all components.",
+            "evaluates": "Complete list of APIs, excipients"
         },
         "B-05": {
             "title": "Formula Justification",
-            "hint": "Upload the justification for each excipient and the combination (if applicable).",
-            "evaluates": " EVALUATED:\n• Justification for each excipient\n• Combination justification (FDC)\n• Dosage form justification\n• Bibliographic references"
+            "hint": "Upload justification for each excipient.",
+            "evaluates": "Justification for each excipient, references"
         },
         "B-06": {
             "title": "Excipients Declaration",
-            "hint": "Upload the declaration of permitted excipients, colorants and preservatives.",
-            "evaluates": " EVALUATED:\n• List of excipients with function\n• Colorants permitted by regulation\n• Preservatives and justification\n• Consistency with B-04"
+            "hint": "Upload declaration of permitted excipients.",
+            "evaluates": "List of excipients, colorants, preservatives"
         },
         "B-07": {
             "title": "Manufacturing Process",
@@ -362,6 +354,11 @@
             "hint": "Upload all product labels.",
             "multiHint": "Must include:\n• Primary label (immediate container)\n• Secondary label (box/carton)\n• Package insert or leaflet\n• One for each commercial presentation",
             "evaluates": " EVALUATED:\n• Primary + Secondary + Insert present\n• Composition = B-04\n• Shelf life = C-02\n• Storage conditions = C-01\n• Manufacturer = A-01\n• All presentations covered"
+        },
+        "E-01": {
+            "title": "Additional Documentation",
+            "hint": "Upload any additional required documentation.",
+            "evaluates": " EVALUATED:\n• Complete documentation\n• Correct format\n• Relevant information"
         }
     },
     "common": {

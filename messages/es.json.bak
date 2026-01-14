@@ -356,11 +356,6 @@
             "hint": "Suba todas las etiquetas del producto.",
             "multiHint": " Debe incluir:\n• Etiqueta primaria (envase inmediato)\n• Etiqueta secundaria (caja/estuche)\n• Inserto o prospecto\n• Una por cada presentación comercial",
             "evaluates": " SE EVALÚA:\n• Primaria + Secundaria + Inserto presentes\n• Composición = B-04\n• Vida útil = C-02\n• Condiciones almacenamiento = C-01\n• Fabricante = A-01\n• Todas las presentaciones cubiertas"
-        },
-        "E-01": {
-            "title": "Documentación Adicional",
-            "hint": "Suba cualquier documentación adicional requerida.",
-            "evaluates": " SE EVALÚA:\n• Documentación completa\n• Formato correcto\n• Información relevante"
         }
     },
     "common": {

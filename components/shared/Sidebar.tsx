@@ -18,7 +18,8 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    Bot
+    Bot,
+    FileSearch
 } from 'lucide-react';
 import LanguageSwitcher from '@/components/shared/LanguageSwitcher';
 import { createClient } from '@/lib/supabase/client';
@@ -84,9 +85,9 @@ export default function Sidebar({ userRole, labName }: SidebarProps) {
             roles: ['super_admin']
         },
         {
-            name: t('nav.audit'),
-            href: `/${locale}/admin/logs`,
-            icon: Activity,
+            name: 'Prompt Auditoría',
+            href: `/${locale}/admin/configuracion/prompt-auditoria`,
+            icon: FileSearch,
             roles: ['super_admin']
         },
 
@@ -104,6 +105,14 @@ export default function Sidebar({ userRole, labName }: SidebarProps) {
             href: `/${locale}/app/dossiers`,
             icon: FolderOpen,
             roles: ['lab_admin', 'lab_uploader', 'lab_viewer']
+        },
+
+        // Auditoría de Documentos - Solo super_admin
+        {
+            name: t('nav.auditoria') || 'Auditoría Docs',
+            href: `/${locale}/app/auditoria`,
+            icon: FileSearch,
+            roles: ['super_admin']
         },
 
         // Otros Documentos - Solo Lab Admin

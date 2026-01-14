@@ -13,12 +13,25 @@ const nextConfig = {
             },
         ],
     },
-    allowedDevOrigins: [
-        'http://127.0.0.1:65413',
-        'http://127.0.0.1:3000',
-        'http://localhost:3000',
-        '192.168.100.28',
-    ],
+    skipMiddlewareUrlNormalize: true,
+    skipTrailingSlashRedirect: true,
+    experimental: {
+        serverActions: {
+            allowedOrigins: [
+                'localhost:3000',
+                'localhost',
+                '127.0.0.1:3000',
+                '127.0.0.1',
+                '192.168.100.28:3000',
+                '192.168.100.28',
+                // Rangos de puertos comunes para proxies
+                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${61300 + i}`),
+                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${58700 + i}`),
+                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${65400 + i}`),
+            ],
+            bodySizeLimit: '50mb',
+        },
+    },
 };
 
 export default withNextIntl(nextConfig);

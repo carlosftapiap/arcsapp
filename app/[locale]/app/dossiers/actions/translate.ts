@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
+import { revalidatePath } from 'next/cache';
 
 // Idiomas soportados por la aplicación
 type SupportedLocale = 'es' | 'en' | 'hi' | 'zh-CN';
@@ -137,36 +138,59 @@ export async function saveReviewWithTranslation(
     const supabase = await createClient();
 
     try {
+        // 1. Obtener el dossier_item_id del documento
+        const { data: doc, error: docError } = await supabase
+            .from('documents')
+            .select('dossier_item_id')
+            .eq('id', documentId)
+            .single();
+        
+        if (docError) {
+            console.warn('Could not get dossier_item_id:', docError.message);
+        }
+
         // Normalizar el locale
         const supportedLocales: SupportedLocale[] = ['es', 'en', 'hi', 'zh-CN'];
         const originalLang: SupportedLocale = supportedLocales.includes(userLocale as SupportedLocale)
             ? (userLocale as SupportedLocale)
             : 'es';
 
-        // Traducir el comentario a todos los idiomas
-        const translatedComments = await translateReviewComment(comment, originalLang, labId);
+        // Intentar traducir, pero no fallar si no hay API key
+        let translatedComments: Record<SupportedLocale, string> | null = null;
+        try {
+            translatedComments = await translateReviewComment(comment, originalLang, labId);
+        } catch (translateError) {
+            console.warn('Translation skipped:', translateError);
+            // Continuar sin traducciones
+        }
 
         // Intentar guardar con traducciones (si la columna existe)
         let newReview;
 
-        // Primer intento: con comments_i18n
-        const result1 = await supabase
-            .from('technical_reviews')
-            .insert({
-                document_id: documentId,
-                reviewer_id: reviewerId,
-                decision: decision,
-                comments: comment,
-                comments_i18n: translatedComments,
-                version_reviewed: versionReviewed
-            })
-            .select()
-            .single();
+        // Si hay traducciones, intentar guardar con ellas
+        if (translatedComments) {
+            const result1 = await supabase
+                .from('technical_reviews')
+                .insert({
+                    document_id: documentId,
+                    reviewer_id: reviewerId,
+                    decision: decision,
+                    comments: comment,
+                    comments_i18n: translatedComments,
+                    version_reviewed: versionReviewed
+                })
+                .select()
+                .single();
 
-        if (result1.error) {
-            // Si falla (probablemente columna no existe), intentar sin comments_i18n
-            console.warn('Retrying without comments_i18n:', result1.error.message);
+            if (!result1.error) {
+                newReview = result1.data;
+            } else {
+                console.warn('Insert with i18n failed, trying without:', result1.error.message);
+            }
+        }
 
+        // Si no hay traducciones o falló el primer intento, guardar sin comments_i18n
+        if (!newReview) {
             const result2 = await supabase
                 .from('technical_reviews')
                 .insert({
@@ -184,8 +208,35 @@ export async function saveReviewWithTranslation(
             }
 
             newReview = result2.data;
-        } else {
-            newReview = result1.data;
+        }
+
+        // 2. Actualizar el estado del dossier_item
+        if (doc?.dossier_item_id) {
+            const newStatus = decision === 'approved' ? 'approved' : 'observed';
+            const { error: updateError } = await supabase
+                .from('dossier_items')
+                .update({ status: newStatus })
+                .eq('id', doc.dossier_item_id);
+            
+            if (updateError) {
+                console.warn('Could not update dossier_item status:', updateError.message);
+            } else {
+                console.log(`✅ dossier_item ${doc.dossier_item_id} status updated to ${newStatus}`);
+            }
+
+            // 3. Obtener dossier_id para revalidar la página
+            const { data: itemData } = await supabase
+                .from('dossier_items')
+                .select('dossier_id')
+                .eq('id', doc.dossier_item_id)
+                .single();
+            
+            if (itemData?.dossier_id) {
+                // Forzar recarga de datos en todas las rutas del dossier
+                revalidatePath(`/es/app/dossiers/${itemData.dossier_id}`);
+                revalidatePath(`/en/app/dossiers/${itemData.dossier_id}`);
+                console.log(`🔄 Revalidated path for dossier ${itemData.dossier_id}`);
+            }
         }
 
         return { success: true, data: newReview };

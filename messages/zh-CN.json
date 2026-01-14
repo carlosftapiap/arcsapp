@@ -8,6 +8,7 @@
         "templates": "模板",
         "aiPrompts": "AI提示词",
         "audit": "审计",
+        "auditoria": "文档审计",
         "products": "产品",
         "dossiers": "档案",
         "extraDocs": "其他文档",
@@ -102,8 +103,10 @@
         "progress": "进度",
         "progressUpload": "已上传文档",
         "progressApproval": "审查员已批准",
+        "progressObserved": "已观察",
         "uploaded": "已上传",
         "approved": "已批准",
+        "observed": "已观察",
         "ready": "就绪",
         "notReady": "未就绪",
         "checklist": "检查清单",
@@ -113,6 +116,8 @@
             "legal": "法律",
             "quality": "质量",
             "efficacy": "疗效",
+            "eficacia": "疗效",
+            "etiquetado": "标签",
             "general": "一般",
             "administrativo": "行政",
             "técnico": "技术",
@@ -160,7 +165,8 @@
     "productTypes": {
         "medicine_general": "一般药物",
         "biologic": "生物制品",
-        "device_medical": "医疗器械"
+        "device_medical": "医疗器械",
+        "supplement_food": "食品补充剂"
     },
     "origin": {
         "imported": "进口",
@@ -174,6 +180,25 @@
         "uploadedBy": "上传者",
         "uploadedAt": "上传日期",
         "maxSize": "最大大小: {size}MB"
+    },
+    "audit": {
+        "previousAudit": "产品先前审计",
+        "viewDetail": "查看详情",
+        "hideDetail": "隐藏详情",
+        "stagesIdentified": "已识别阶段",
+        "problemsDetected": "检测到的问题",
+        "missingDocuments": "缺失文档",
+        "analysisSummary": "分析摘要",
+        "criticalProblems": "严重问题",
+        "complete": "完整",
+        "incomplete": "不完整",
+        "critical": "严重",
+        "warning": "警告",
+        "info": "信息",
+        "pages": "页码",
+        "page": "页",
+        "recommendation": "建议",
+        "andMore": "还有 {count} 个（查看详情）"
     },
     "ai": {
         "pendingAdmin": "待管理员审核",
@@ -222,7 +247,7 @@
             "title": "开发与生产",
             "hint": "包含产品开发文件的文件夹。可上传多个文件。",
             "multiHint": "📁 此文件夹包含：\n• B-01.1 产品描述\n• B-01.2 生产工艺\n• B-01.3 定性定量配方\n• B-01.4 过程控制（IPC）\n• B-01.5 工艺流程图\n• B-01.6 超量/损耗",
-            "evaluates": "🔍 评估内容：\n• 完整的开发文档\n• 子文档之间的一致性\n• 工艺可追溯性"
+            "evaluates": "🔍 AI将验证：\n\n📋 产品描述：\n• 物理描述（颜色、形状、气味）\n• 化学和药学特性\n\n⚙️ 生产工艺：\n• 完整的操作顺序\n• 关键参数（时间、温度）\n• 使用的设备\n\n📊 定性定量配方：\n• 所有API及精确数量\n• 所有赋形剂及声明功能\n• 着色剂和防腐剂\n\n🔬 过程控制（IPC）：\n• 已定义的控制点\n• 接受限值\n• 取样频率\n\n📈 流程图：\n• 工艺的清晰可视化表示\n• 包含所有阶段\n• 标记控制点\n\n⚖️ 超量/损耗（如适用）：\n• 超量的技术理由\n• 补偿计算\n\n✅ 整体一致性：\n• 所有要素之间的可追溯性\n• 各部分数据一致性"
         },
         "B-01-1": {
             "title": "产品描述",

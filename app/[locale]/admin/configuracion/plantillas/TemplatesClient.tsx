@@ -241,7 +241,9 @@ export default function TemplatesClient({ initialTemplates }: Props) {
                                         onChange={e => setNewTemplateData({ ...newTemplateData, product_type: e.target.value })}
                                     >
                                         <option value="medicine_general">Medicamento</option>
+                                        <option value="biologic">Biológico</option>
                                         <option value="device_medical">Disp. Médico</option>
+                                        <option value="supplement_food">Suplemento Alimenticio</option>
                                     </select>
                                     <input
                                         type="number"

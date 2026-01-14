@@ -5,13 +5,14 @@ import { useTranslations, useLocale } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import {
     ChevronLeft, FileText, Upload, CheckCircle2, AlertCircle,
-    Clock, Eye, Trash2, Download, RefreshCw, Bot, X, Languages
+    Clock, Eye, Trash2, Download, RefreshCw, Bot, X, Languages, FileSearch
 } from 'lucide-react';
 import Link from 'next/link';
 import { runAIAnalysis } from '@/app/[locale]/app/dossiers/actions/ai-analysis';
 import { runAIAnalysisV2 } from '@/app/[locale]/app/dossiers/actions/ai-analysis-v2';
 import { runAIAnalysisForItem } from '@/app/[locale]/app/dossiers/actions/ai-analysis-item';
 import { saveReviewWithTranslation } from '@/app/[locale]/app/dossiers/actions/translate';
+import { saveLabComment } from '@/app/[locale]/app/dossiers/actions/lab-comment';
 
 // Interfaces Actualizadas
 interface AIAnalysis {
@@ -60,6 +61,7 @@ interface DossierItem {
     documents: Document[]; // Array de docs subidos ordenados por fecha desc
     reviewer_notes?: string; // Legacy support
     review_status?: string; // Legacy support
+    lab_comment_json?: { es?: string; en?: string; hi?: string; 'zh-CN'?: string }; // Comentario del laboratorio
 }
 
 interface Dossier {
@@ -71,10 +73,24 @@ interface Dossier {
     lab_id: string; // Needed for verify permissions
 }
 
+interface PreviousAudit {
+    id: string;
+    product_name: string;
+    manufacturer?: string;
+    total_pages: number;
+    stages_found: { stage_code: string; stage_name: string; pages: number[]; page_range: string; status: string; details: string }[];
+    stages_missing?: { stage_code: string; stage_name: string; module: string; is_required: boolean }[];
+    problems_found: { type: string; description: string; page: number; stage_code?: string; recommendation: string }[];
+    summary: string;
+    created_at: string;
+    processing_time_ms: number;
+}
+
 interface Props {
     dossier: Dossier;
     initialItems: DossierItem[];
     userRole: string;
+    previousAudit?: PreviousAudit | null;
 }
 
 // Helper: Colores por módulo (tonos más fuertes)
@@ -210,7 +226,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
     return text || JSON.stringify(data, null, 2);
 }
 
-export default function DossierDetailClient({ dossier, initialItems, userRole }: Props) {
+export default function DossierDetailClient({ dossier, initialItems, userRole, previousAudit }: Props) {
     console.log("Rendering DossierDetailClient Clean Reconstruction");
     const t = useTranslations();
     const locale = useLocale();
@@ -224,6 +240,12 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
     const [reviewDecision, setReviewDecision] = useState<'approved' | 'observed' | null>(null);
     const [reviewNotes, setReviewNotes] = useState(''); // Legacy state support
     const [jsonModalData, setJsonModalData] = useState<any | null>(null);
+    const [showAuditDetails, setShowAuditDetails] = useState(false);
+    
+    // Estado para comentario del laboratorio
+    const [labCommentItemId, setLabCommentItemId] = useState<string | null>(null);
+    const [labCommentText, setLabCommentText] = useState('');
+    const [savingLabComment, setSavingLabComment] = useState(false);
 
     // Permisos
     const isSuperAdmin = userRole === 'super_admin';
@@ -258,17 +280,46 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
     }, {} as Record<string, DossierItem[]>);
 
     // Ordenar módulos
-    const moduleOrder = ['Legal', 'Quality', 'Efficacy', 'Safety', 'General'];
+    const moduleOrder = ['Legal', 'Quality', 'Efficacy', 'Safety', 'General', 'Eficacia', 'Etiquetado'];
     const sortedModules = Object.keys(groupedItems).sort((a, b) => moduleOrder.indexOf(a) - moduleOrder.indexOf(b));
 
-    // Progress - Documentos subidos
-    const totalRequired = items.filter(i => i.checklist_item.required).length;
-    const uploadedRequired = items.filter(i => i.checklist_item.required && (i.status === 'uploaded' || i.status === 'approved')).length;
-    const uploadProgress = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
+    // Progress - Documentos subidos (todos los que tienen algo subido: uploaded, approved u observed)
+    const totalItems = items.length;
+    const uploadedItems = items.filter(i => i.status === 'uploaded' || i.status === 'approved' || i.status === 'observed').length;
+    const uploadProgress = totalItems > 0 ? Math.round((uploadedItems / totalItems) * 100) : 0;
     
     // Progress - Documentos aprobados por técnico
-    const approvedRequired = items.filter(i => i.checklist_item.required && i.status === 'approved').length;
-    const approvalProgress = totalRequired > 0 ? Math.round((approvedRequired / totalRequired) * 100) : 0;
+    const approvedItems = items.filter(i => i.status === 'approved').length;
+    const approvalProgress = totalItems > 0 ? Math.round((approvedItems / totalItems) * 100) : 0;
+    
+    // Progress - Documentos observados (con problemas)
+    const observedItems = items.filter(i => i.status === 'observed').length;
+    const observedProgress = totalItems > 0 ? Math.round((observedItems / totalItems) * 100) : 0;
+
+    // Función para guardar comentario del laboratorio
+    const handleSaveLabComment = async (itemId: string) => {
+        setSavingLabComment(true);
+        try {
+            const result = await saveLabComment(itemId, labCommentText, locale, dossier.lab_id);
+            if (result.success) {
+                // Actualizar el estado local
+                setItems(prev => prev.map(item => 
+                    item.id === itemId 
+                        ? { ...item, lab_comment_json: result.data }
+                        : item
+                ));
+                setLabCommentItemId(null);
+                setLabCommentText('');
+            } else {
+                alert('Error al guardar comentario: ' + result.error);
+            }
+        } catch (error: any) {
+            console.error('Error saving lab comment:', error);
+            alert('Error al guardar comentario');
+        } finally {
+            setSavingLabComment(false);
+        }
+    };
 
     const handleDownload = async (filePath: string, fileName: string) => {
         const supabase = createClient();
@@ -434,9 +485,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
 
             const newReview = result.data;
 
-            // Actualizar Estado Maestro del Item
+            // El estado del dossier_item ya se actualiza en la server action
             const newStatus = reviewDecision === 'approved' ? 'approved' : 'observed';
-            await supabase.from('dossier_items').update({ status: newStatus }).eq('id', itemId);
 
             // Actualizar UI
             setItems(prev => prev.map(i => {
@@ -455,7 +505,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
 
             setReviewDecision(null);
             setReviewComment('');
-            alert('Dictamen registrado y traducido automáticamente.');
+            alert('Dictamen registrado correctamente.');
 
         } catch (error: any) {
             alert(error.message);
@@ -608,7 +658,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                         />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                        {uploadedRequired} / {totalRequired} {t('dossiers.uploaded')}
+                        {uploadedItems} / {totalItems} {t('dossiers.uploaded')}
                     </p>
                 </div>
 
@@ -627,10 +677,190 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                         />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                        {approvedRequired} / {totalRequired} {t('dossiers.approved')}
+                        {approvedItems} / {totalItems} {t('dossiers.approved')}
+                    </p>
+                </div>
+
+                {/* Barra 3: Documentos Observados */}
+                <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            ⚠️ {t('dossiers.progressObserved') || 'Observados'}
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">{observedProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div
+                            className={`h-3 rounded-full transition-all duration-500 ${observedItems === 0 ? 'bg-gray-300' : observedProgress >= 20 ? 'bg-red-500' : 'bg-orange-400'}`}
+                            style={{ width: `${observedProgress}%` }}
+                        />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                        {observedItems} / {totalItems} {t('dossiers.observed') || 'observados'}
                     </p>
                 </div>
             </div>
+
+            {/* Auditoría - Visible para todos los roles */}
+            {previousAudit && (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                            📋 {t('audit.previousAudit')}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                                {new Date(previousAudit.created_at).toLocaleDateString('es-ES')}
+                            </span>
+                            <button
+                                onClick={() => setShowAuditDetails(!showAuditDetails)}
+                                className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1"
+                            >
+                                <Eye size={14} />
+                                {showAuditDetails ? t('audit.hideDetail') : t('audit.viewDetail')}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Vista detallada */}
+                    {showAuditDetails && (
+                        <div className="space-y-4 mt-4 border-t border-indigo-200 pt-4">
+                            {/* Todas las etapas con detalles */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                    📑 {t('audit.stagesIdentified')} ({previousAudit.stages_found?.length || 0})
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {previousAudit.stages_found?.map((stage, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            className={`p-3 rounded-lg border ${
+                                                stage.status === 'complete' ? 'bg-green-50 border-green-200' :
+                                                stage.status === 'incomplete' ? 'bg-amber-50 border-amber-200' :
+                                                'bg-gray-50 border-gray-200'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <span className="font-semibold text-sm">{stage.stage_code}</span>
+                                                    <p className="text-xs text-gray-600">{stage.stage_name}</p>
+                                                </div>
+                                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                                    stage.status === 'complete' ? 'bg-green-200 text-green-800' :
+                                                    stage.status === 'incomplete' ? 'bg-amber-200 text-amber-800' :
+                                                    'bg-gray-200 text-gray-800'
+                                                }`}>
+                                                    {stage.status === 'complete' ? t('audit.complete') : stage.status === 'incomplete' ? t('audit.incomplete') : stage.status}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-1">📄 {t('audit.pages')}: {stage.page_range || stage.pages?.join(', ')}</p>
+                                            {stage.details && <p className="text-xs text-gray-600 mt-1 italic">{stage.details}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Todos los problemas */}
+                            {previousAudit.problems_found && previousAudit.problems_found.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                        ⚠️ {t('audit.problemsDetected')} ({previousAudit.problems_found.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {previousAudit.problems_found.map((problem, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className={`p-3 rounded-lg border ${
+                                                    problem.type === 'critical' ? 'bg-red-50 border-red-200' :
+                                                    problem.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                                    'bg-blue-50 border-blue-200'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                                        problem.type === 'critical' ? 'bg-red-200 text-red-800' :
+                                                        problem.type === 'warning' ? 'bg-amber-200 text-amber-800' :
+                                                        'bg-blue-200 text-blue-800'
+                                                    }`}>
+                                                        {problem.type === 'critical' ? `🔴 ${t('audit.critical')}` : problem.type === 'warning' ? `🟡 ${t('audit.warning')}` : `🔵 ${t('audit.info')}`}
+                                                    </span>
+                                                    {problem.stage_code && (
+                                                        <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">{problem.stage_code}</span>
+                                                    )}
+                                                    <span className="text-xs text-gray-500">{t('audit.page')} {problem.page}</span>
+                                                </div>
+                                                <p className="text-sm text-gray-800 mt-2">{problem.description}</p>
+                                                {problem.recommendation && (
+                                                    <p className="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">
+                                                        💡 <strong>{t('audit.recommendation')}:</strong> {problem.recommendation}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Documentos Faltantes */}
+                            {previousAudit.stages_missing && previousAudit.stages_missing.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                                        📋 {t('audit.missingDocuments')} ({previousAudit.stages_missing.length})
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        {previousAudit.stages_missing.map((stage, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className="p-2 rounded-lg border border-amber-200 bg-amber-50"
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <span className="font-mono text-xs font-semibold text-amber-800">{stage.stage_code}</span>
+                                                        <p className="text-xs text-gray-700">{stage.stage_name}</p>
+                                                    </div>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">
+                                                        {stage.module}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Resumen */}
+                            {previousAudit.summary && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                    <h4 className="text-sm font-semibold text-gray-800 mb-2">📝 {t('audit.analysisSummary')}</h4>
+                                    <p className="text-sm text-gray-600">{previousAudit.summary}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Problemas críticos - resumen cuando está colapsado */}
+                    {!showAuditDetails && previousAudit.problems_found && previousAudit.problems_found.filter(p => p.type === 'critical').length > 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <h4 className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-1">
+                                ⚠️ {t('audit.criticalProblems')}
+                            </h4>
+                            <ul className="space-y-1">
+                                {previousAudit.problems_found.filter(p => p.type === 'critical').slice(0, 3).map((problem, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">
+                                        • <strong>{t('audit.page')} {problem.page}</strong>: {problem.description}
+                                    </li>
+                                ))}
+                                {previousAudit.problems_found.filter(p => p.type === 'critical').length > 3 && (
+                                    <li className="text-xs text-red-600 italic">
+                                        ... {t('audit.andMore', { count: previousAudit.problems_found.filter(p => p.type === 'critical').length - 3 })}
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            )}
+
 
             {/* Modules Loop */}
             <div className="space-y-6">
@@ -708,13 +938,13 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                         <div className="mt-3 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                                             <p className="text-sm text-blue-800">
                                                                 <span className="font-medium">📋 </span>
-                                                                {t(`stageInstructions.${checkItem.code}.hint`) || 'Suba el documento correspondiente a este requisito.'}
+                                                                {t(`stageInstructions.${checkItem.code.replace(/\./g, '-')}.hint`) || 'Suba el documento correspondiente a este requisito.'}
                                                             </p>
                                                             {/* multiHint deshabilitado temporalmente - solo items específicos lo tienen */}
                                                             {/* Criterios de evaluación */}
                                                             {(() => {
                                                                 try {
-                                                                    const evaluates = t(`stageInstructions.${checkItem.code}.evaluates`);
+                                                                    const evaluates = t(`stageInstructions.${checkItem.code.replace(/\./g, '-')}.evaluates`);
                                                                     if (evaluates && !evaluates.includes('stageInstructions.')) {
                                                                         return (
                                                                             <details className="mt-3 border-t border-blue-200 pt-2">
@@ -730,6 +960,78 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                                 } catch { return null; }
                                                                 return null;
                                                             })()}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Comentario del Laboratorio - Solo visible para usuarios del lab */}
+                                                    {['super_admin', 'lab_admin', 'lab_uploader', 'lab_viewer'].includes(userRole) && (
+                                                        <div className="mt-3 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <h4 className="text-xs font-bold uppercase text-yellow-700 tracking-wide flex items-center gap-2">
+                                                                    <span className="text-base">💬</span>
+                                                                    Comentario del Laboratorio
+                                                                </h4>
+                                                                {isUploader && labCommentItemId !== item.id && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setLabCommentItemId(item.id);
+                                                                            const existingComment = item.lab_comment_json?.[locale as keyof typeof item.lab_comment_json] || '';
+                                                                            setLabCommentText(existingComment);
+                                                                        }}
+                                                                        className="text-xs text-yellow-700 hover:text-yellow-900 underline"
+                                                                    >
+                                                                        {item.lab_comment_json ? 'Editar' : 'Agregar comentario'}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            {labCommentItemId === item.id ? (
+                                                                <div className="space-y-2">
+                                                                    <textarea
+                                                                        value={labCommentText}
+                                                                        onChange={(e) => setLabCommentText(e.target.value)}
+                                                                        placeholder="Escriba un comentario o nota sobre esta etapa..."
+                                                                        className="w-full p-2 text-sm border border-yellow-300 rounded-md focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                                                                        rows={3}
+                                                                    />
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            onClick={() => handleSaveLabComment(item.id)}
+                                                                            disabled={savingLabComment}
+                                                                            className="text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md disabled:opacity-50 flex items-center gap-1"
+                                                                        >
+                                                                            {savingLabComment ? (
+                                                                                <>
+                                                                                    <RefreshCw size={12} className="animate-spin" />
+                                                                                    Guardando...
+                                                                                </>
+                                                                            ) : (
+                                                                                'Guardar'
+                                                                            )}
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setLabCommentItemId(null);
+                                                                                setLabCommentText('');
+                                                                            }}
+                                                                            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                                                                        >
+                                                                            Cancelar
+                                                                        </button>
+                                                                        <span className="text-[10px] text-yellow-600 ml-auto">
+                                                                            Se traduce automáticamente a ES/EN/HI/ZH
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : item.lab_comment_json ? (
+                                                                <p className="text-sm text-yellow-800 whitespace-pre-line">
+                                                                    {item.lab_comment_json[locale as keyof typeof item.lab_comment_json] || item.lab_comment_json.es || 'Sin comentario'}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-xs text-yellow-600 italic">
+                                                                    No hay comentarios del laboratorio para esta etapa.
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     )}
 
@@ -750,10 +1052,10 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                         // Caso: Hay documento (Mostrar Bloques ABCD)
                                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
 
-                                                            {/* Bloque A: Archivo(s) */}
-                                                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                                            {/* Bloque A: Archivo(s) - Azul */}
+                                                            <div className="bg-gradient-to-br from-slate-50 to-blue-50 p-4 rounded-lg border-2 border-blue-200 shadow-sm">
                                                                 <div className="flex items-center justify-between mb-3">
-                                                                    <h4 className="text-xs font-bold uppercase text-gray-500 tracking-wide">
+                                                                    <h4 className="text-xs font-bold uppercase text-blue-700 tracking-wide flex items-center gap-2"><span className="text-base">📁</span>
                                                                         {t('dossiers.detail.blockA')}
                                                                         {checkItem.allows_multiple_files && (
                                                                             <span className="ml-2 text-[10px] font-normal bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
@@ -871,9 +1173,16 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                                 </div>
                                                             </div>
 
-                                                            {/* Bloque B: Estado del Requisito */}
-                                                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-center items-center text-center">
-                                                                <h4 className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-wide w-full text-left">{t('dossiers.detail.blockB')}</h4>
+                                                            {/* Bloque B: Estado del Requisito - Dinámico según estado */}
+                                                            <div className={`p-4 rounded-lg border-2 shadow-sm flex flex-col justify-center items-center text-center ${
+                                                                item.status === 'approved' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300' :
+                                                                item.status === 'observed' ? 'bg-gradient-to-br from-red-50 to-orange-50 border-red-300' :
+                                                                'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300'
+                                                            }`}>
+                                                                <h4 className={`text-xs font-bold uppercase mb-3 tracking-wide w-full text-left flex items-center gap-2 ${
+                                                                    item.status === 'approved' ? 'text-green-700' :
+                                                                    item.status === 'observed' ? 'text-red-700' : 'text-amber-700'
+                                                                }`}><span className="text-base">{item.status === 'approved' ? '✅' : item.status === 'observed' ? '⚠️' : '⏳'}</span>{t('dossiers.detail.blockB')}</h4>
 
                                                                 <div className={`
                                                                 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 mb-2
@@ -898,9 +1207,9 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                                 <p className="text-xs text-gray-400 mt-2">Dictamen técnico oficial</p>
                                                             </div>
 
-                                                            {/* Bloque C: Análisis Administrador */}
-                                                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
-                                                                <h4 className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-wide relative z-10">{t('dossiers.detail.blockC')}</h4>
+                                                            {/* Bloque C: Análisis IA - Púrpura */}
+                                                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-lg border-2 border-purple-200 shadow-sm relative overflow-hidden">
+                                                                <h4 className="text-xs font-bold uppercase text-purple-700 mb-3 tracking-wide relative z-10 flex items-center gap-2"><span className="text-base">🤖</span>{t('dossiers.detail.blockC')}</h4>
 
                                                                 {!currentDoc.ai_document_analyses?.length ? (
                                                                     <div className="text-center py-4 relative z-10">
@@ -1011,9 +1320,9 @@ export default function DossierDetailClient({ dossier, initialItems, userRole }:
                                                                 )}
                                                             </div>
 
-                                                            {/* Bloque D: Dictamen Técnico */}
-                                                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm lg:col-span-2">
-                                                                <h4 className="text-xs font-bold uppercase text-gray-500 mb-3 tracking-wide">{t('dossiers.detail.blockD')}</h4>
+                                                            {/* Bloque D: Dictamen Técnico - Naranja */}
+                                                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-lg border-2 border-orange-200 shadow-sm lg:col-span-2">
+                                                                <h4 className="text-xs font-bold uppercase text-orange-700 mb-3 tracking-wide flex items-center gap-2"><span className="text-base">👨‍⚖️</span>{t('dossiers.detail.blockD')}</h4>
 
                                                                 {/* Historial rápido (Último dictamen) */}
                                                                 {currentDoc.technical_reviews && currentDoc.technical_reviews.length > 0 && (() => {

@@ -35,6 +35,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         .select(`
       id,
       status,
+      lab_comment_json,
       checklist_items:checklist_item_id (
         id, code, module, title_i18n_json, required, critical, sort_order, allows_multiple_files
       ),
@@ -188,7 +189,8 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             id: row.id,
             status: row.status,
             checklist_item: checklistItem,
-            documents: documentsSorted
+            documents: documentsSorted,
+            lab_comment_json: row.lab_comment_json
         };
     });
 
@@ -231,5 +233,65 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
 
     console.log('🔑 User role determined:', { userId: user?.id, userRole });
 
-    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} />;
+    // 6. Buscar auditorías previas del producto (múltiples estrategias)
+    let previousAudit = null;
+    
+    console.log('🔍 Buscando auditoría para dossier:', { 
+        product_id: dossier.product_id, 
+        product_name: dossier.product_name,
+        lab_id: dossier.lab_id 
+    });
+    
+    // Estrategia 1: Buscar por product_id si existe
+    if (dossier.product_id) {
+        const { data: auditData } = await supabase
+            .from('audits')
+            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
+            .eq('product_id', dossier.product_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (auditData) {
+            previousAudit = auditData;
+            console.log('📋 Auditoría encontrada por product_id:', auditData.id);
+        }
+    }
+    
+    // Estrategia 2: Buscar por nombre del producto (coincidencia parcial)
+    if (!previousAudit && dossier.product_name) {
+        const { data: auditByName } = await supabase
+            .from('audits')
+            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
+            .ilike('product_name', `%${dossier.product_name.split(' ')[0]}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (auditByName) {
+            previousAudit = auditByName;
+            console.log('📋 Auditoría encontrada por nombre:', auditByName.id);
+        }
+    }
+    
+    // Estrategia 3: Buscar por lab_id Y nombre del producto (más específico)
+    if (!previousAudit && dossier.lab_id && dossier.product_name) {
+        const { data: auditByLabAndName } = await supabase
+            .from('audits')
+            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
+            .eq('lab_id', dossier.lab_id)
+            .ilike('product_name', `%${dossier.product_name.split(' ')[0]}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (auditByLabAndName) {
+            previousAudit = auditByLabAndName;
+            console.log('📋 Auditoría encontrada por lab_id + nombre:', auditByLabAndName.id);
+        }
+    }
+    
+    console.log('📋 Resultado búsqueda auditoría:', previousAudit ? 'ENCONTRADA' : 'NO ENCONTRADA');
+
+    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} previousAudit={previousAudit} />;
 }

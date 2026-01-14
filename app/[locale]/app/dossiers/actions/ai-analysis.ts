@@ -5,6 +5,8 @@ import OpenAI from 'openai';
 import { buildCompletePrompt, isMultiFileStage } from '@/lib/ai/prompts-arcsa';
 // @ts-ignore
 const mammoth = require('mammoth');
+// @ts-ignore
+const pdfParse = require('pdf-parse');
 
 /**
  * Análisis de documento usando OpenAI Responses API con input_file
@@ -78,12 +80,9 @@ export async function runAIAnalysis(documentId: string) {
 
         if (!docsToAnalyze.length) throw new Error('No hay archivos para analizar.');
 
-        // 4) Descargar cada archivo y preparar para OpenAI
+        // 4) Descargar cada archivo y extraer texto
         const fileNames: string[] = [];
-        const fileParts: any[] = [];
-
-        let totalBytes = 0;
-        const MAX_TOTAL = 50 * 1024 * 1024; // 50MB límite OpenAI
+        const textParts: string[] = [];
 
         for (const d of docsToAnalyze) {
             const fileName = d.file_path.split('/').pop() || 'documento.pdf';
@@ -95,49 +94,48 @@ export async function runAIAnalysis(documentId: string) {
 
             if (fileError || !fileData) {
                 console.error(`❌ Error descargando ${fileName}:`, fileError);
-                fileParts.push({ type: 'input_text', text: `[ERROR: No se pudo descargar ${fileName}]` });
+                textParts.push(`\n### FILE: ${fileName}\n[ERROR: No se pudo descargar]\n`);
                 continue;
             }
 
             const arrayBuffer = await fileData.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
-
-            totalBytes += buffer.length;
-            if (totalBytes > MAX_TOTAL) {
-                fileParts.push({
-                    type: 'input_text',
-                    text: `[WARNING: Se excedió el límite de 50MB. Se omitieron archivos restantes.]`
-                });
-                break;
-            }
-
             const lower = d.file_path.toLowerCase();
 
-            if (lower.endsWith('.pdf')) {
-                const base64 = buffer.toString('base64');
-                console.log(`✅ PDF preparado: ${fileName} (${(buffer.length / 1024).toFixed(1)}KB)`);
-                fileParts.push({
-                    type: 'input_file',
-                    filename: fileName,
-                    file_data: `data:application/pdf;base64,${base64}`,
-                });
-            } else if (lower.endsWith('.docx')) {
-                const result = await mammoth.extractRawText({ buffer });
-                const text = (result.value || '').slice(0, 15000);
-                console.log(`✅ DOCX extraído: ${fileName} (${text.length} chars)`);
-                fileParts.push({
-                    type: 'input_text',
-                    text: `\n### FILE: ${fileName}\n${text}\n### END FILE\n`
-                });
-            } else {
-                fileParts.push({
-                    type: 'input_text',
-                    text: `[WARNING: Formato no soportado: ${fileName}]`
-                });
+            try {
+                let extractedText = '';
+                
+                if (lower.endsWith('.pdf')) {
+                    const pdfData = await pdfParse(buffer);
+                    extractedText = (pdfData.text || '').slice(0, 15000);
+                    console.log(`✅ PDF extraído: ${fileName} (${extractedText.length} chars)`);
+                } else if (lower.endsWith('.docx')) {
+                    const result = await mammoth.extractRawText({ buffer });
+                    extractedText = (result.value || '').slice(0, 15000);
+                    console.log(`✅ DOCX extraído: ${fileName} (${extractedText.length} chars)`);
+                } else {
+                    extractedText = `[Formato no soportado: ${fileName}]`;
+                }
+                
+                if (extractedText.trim().length < 50) {
+                    textParts.push(`\n### FILE: ${fileName}\n[ADVERTENCIA: PDF posiblemente escaneado - texto muy limitado]\n${extractedText}\n`);
+                } else {
+                    textParts.push(`\n### FILE_START: ${fileName}\n${extractedText}\n### FILE_END: ${fileName}\n`);
+                }
+            } catch (extractError: any) {
+                console.error(`❌ Error extrayendo ${fileName}:`, extractError);
+                textParts.push(`\n### FILE: ${fileName}\n[ERROR EXTRACCIÓN: ${extractError.message}]\n`);
             }
         }
+        
+        const combinedContent = textParts.join('\n');
 
-        // 5) Prompt ARCSA
+        // 5) Validar contenido extraído
+        if (!combinedContent || combinedContent.trim().length < 100) {
+            throw new Error('No se pudo extraer texto suficiente de los archivos. Posibles PDFs escaneados sin OCR.');
+        }
+
+        // 6) Prompt ARCSA
         const { systemPrompt, userPrompt } = buildCompletePrompt({
             stageCode,
             stageName,
@@ -145,30 +143,25 @@ export async function runAIAnalysis(documentId: string) {
             module: stageModule,
             isMultiFile,
             customPrompt,
-            documentContent: '', // vacío porque el PDF va como input_file
+            documentContent: combinedContent,
             fileNames
         });
 
-        console.log(`🤖 Enviando ${fileParts.length} archivo(s) a OpenAI Responses API...`);
+        console.log(`🤖 Enviando ${fileNames.length} archivo(s) a OpenAI (${combinedContent.length} chars)...`);
 
-        // 6) Responses API con input_file (soporta PDFs escaneados)
-        const resp = await (client as any).responses.create({
+        // 7) Chat Completions API
+        const resp = await client.chat.completions.create({
             model: 'gpt-4o-mini',
-            input: [
-                { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
-                {
-                    role: 'user',
-                    content: [
-                        { type: 'input_text', text: userPrompt },
-                        ...fileParts
-                    ]
-                }
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
             ],
-            text: { format: { type: 'json_object' } },
+            response_format: { type: 'json_object' },
             temperature: 0.2,
+            max_tokens: 4000
         });
 
-        const out = resp.output_text?.trim();
+        const out = resp.choices[0]?.message?.content?.trim();
         if (!out) throw new Error('La IA no devolvió respuesta.');
 
         console.log(`✅ Respuesta recibida de OpenAI`);

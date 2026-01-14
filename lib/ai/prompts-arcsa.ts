@@ -162,23 +162,68 @@ Alertas:
 
     // ========== MÓDULO B - CALIDAD ==========
     'B-01': `
-=== EVALUACIÓN B-01: CoA PRODUCTO TERMINADO ===
-Verifica:
-1. Certificado de Análisis de lote representativo
-2. Ensayos para CADA API declarado en fórmula
-3. Cumplimiento de especificaciones
-4. Lote, fecha de fabricación, fecha de vencimiento
-5. Laboratorio que emite el CoA
+=== EVALUACIÓN B-01: DESARROLLO Y FABRICACIÓN (MULTI-ARCHIVO) ===
+Esta etapa puede contener uno o varios archivos que en conjunto deben incluir:
 
-Cruces obligatorios:
-- APIs evaluados deben coincidir con B-04 (fórmula)
-- Métodos deben ser consistentes con B-09
-- Especificaciones deben coincidir con B-03
+DOCUMENTOS REQUERIDOS (buscar en los archivos subidos):
+1. DESCRIPCIÓN DEL PRODUCTO
+   - Descripción física (color, forma, olor, sabor si aplica)
+   - Características químicas
+   - Propiedades farmacéuticas
 
-Alertas:
-- Falta ensayo de un API = ERROR CRÍTICO
-- Resultado fuera de especificación = ERROR CRÍTICO
-- Lote diferente al de estabilidad = OBSERVACIÓN
+2. PROCESO DE FABRICACIÓN
+   - Secuencia completa de operaciones paso a paso
+   - Parámetros críticos (tiempo, temperatura, velocidad)
+   - Equipos utilizados en cada etapa
+
+3. FÓRMULA CUALI-CUANTITATIVA
+   - TODOS los APIs con cantidades exactas (mg, g, %)
+   - TODOS los excipientes con función declarada
+   - Colorantes y conservantes si aplica
+
+4. CONTROLES EN PROCESO (IPC)
+   - Puntos de control definidos en cada etapa crítica
+   - Límites de aceptación para cada parámetro
+   - Frecuencia de muestreo
+
+5. FLUJOGRAMA DE PROCESO
+   - Representación visual clara del proceso
+   - Todas las etapas incluidas
+   - Puntos de control marcados
+
+6. OVERAGES / PÉRDIDAS (si aplica)
+   - Justificación técnica del overage
+   - Cálculos de compensación por pérdidas
+
+VALIDACIÓN:
+- Analiza TODOS los archivos subidos
+- Identifica qué documentos están PRESENTES y cuáles FALTAN
+- Verifica COHERENCIA entre los documentos (ej: APIs en fórmula vs proceso)
+
+RESULTADO ESPERADO:
+{
+    "documentos_encontrados": {
+        "descripcion_producto": true/false,
+        "proceso_fabricacion": true/false,
+        "formula_cualicuantitativa": true/false,
+        "controles_proceso_ipc": true/false,
+        "flujograma": true/false,
+        "overages_perdidas": true/false/"no_aplica"
+    },
+    "documentos_faltantes": ["lista de documentos no encontrados"],
+    "apis_detectados": ["lista de APIs encontrados en fórmula"],
+    "excipientes_detectados": ["lista de excipientes"],
+    "coherencia_interna": "ALTA|MEDIA|BAJA",
+    "observaciones": ["lista de inconsistencias encontradas"],
+    "estado_etapa": "COMPLETA|INCOMPLETA|OBSERVADA"
+}
+
+Alertas críticas:
+- Falta fórmula cualicuantitativa = ERROR CRÍTICO
+- Falta proceso de fabricación = ERROR CRÍTICO
+- Falta flujograma = OBSERVACIÓN
+- Falta IPC = OBSERVACIÓN
+- Inconsistencia entre fórmula y proceso = ERROR CRÍTICO
 `,
 
     'B-02': `
@@ -682,7 +727,7 @@ ${documentContent}
 // ============================================================================
 // ITEMS QUE PERMITEN MÚLTIPLES ARCHIVOS
 // ============================================================================
-export const MULTI_FILE_STAGES = ['B-02', 'B-07', 'B-08', 'B-09', 'C-01', 'C-03', 'C-05', 'A-01'];
+export const MULTI_FILE_STAGES = ['B-01', 'B-02', 'B-07', 'B-08', 'B-09', 'C-01', 'C-03', 'C-05', 'A-01'];
 
 export function isMultiFileStage(stageCode: string): boolean {
     return MULTI_FILE_STAGES.includes(stageCode);

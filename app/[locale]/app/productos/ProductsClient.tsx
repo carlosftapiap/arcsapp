@@ -254,7 +254,9 @@ export default function ProductsClient({ initialProducts, availableLabs, initial
                                         disabled={!!editingId} // Tipo no editable
                                     >
                                         <option value="medicine_general">{t('productTypes.medicine_general')}</option>
+                                        <option value="biologic">{t('productTypes.biologic')}</option>
                                         <option value="device_medical">{t('productTypes.device_medical')}</option>
+                                        <option value="supplement_food">{t('productTypes.supplement_food') || 'Suplemento Alimenticio'}</option>
                                     </select>
                                 </div>
 
