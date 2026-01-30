@@ -5,8 +5,7 @@ import OpenAI from 'openai';
 import { buildCompletePrompt, isMultiFileStage } from '@/lib/ai/prompts-arcsa';
 // @ts-ignore
 const mammoth = require('mammoth');
-// @ts-ignore
-const pdfParse = require('pdf-parse');
+import pdfParse from '@/lib/pdf-parse';
 
 /**
  * Análisis de documento usando OpenAI Responses API con input_file

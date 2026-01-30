@@ -39,8 +39,9 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
       checklist_items:checklist_item_id (
         id, code, module, title_i18n_json, required, critical, sort_order, allows_multiple_files
       ),
-      documents (
-        id, file_path, uploaded_at, version, status,
+      documents:documents(
+        id, file_path, uploaded_at, version, status, uploaded_by,
+        profiles ( full_name ),
         ai_document_analyses (
           id, created_at, status, alerts, analysis_json
         ),
@@ -177,13 +178,16 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         // Manejo robusto de join único
         const checklistItem = Array.isArray(row.checklist_items) ? row.checklist_items[0] : row.checklist_items;
 
-        // Ordenar documentos en Javascript (Versión Descendente > Fecha Descendente)
-        const documentsSorted = (row.documents || []).slice().sort((a: any, b: any) => {
-            const vA = a.version || 0;
-            const vB = b.version || 0;
-            if (vA !== vB) return vB - vA; // Mayor versión primero
-            return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime(); // Más reciente primero
-        });
+        // Ordenar documentos en Javascript: Filtrar eliminados + (Versión Descendente > Fecha Descendente)
+        const documentsSorted = (row.documents || [])
+            .filter((d: any) => d.status !== 'deleted')
+            .slice()
+            .sort((a: any, b: any) => {
+                const vA = a.version || 0;
+                const vB = b.version || 0;
+                if (vA !== vB) return vB - vA; // Mayor versión primero
+                return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime(); // Más reciente primero
+            });
 
         return {
             id: row.id,
@@ -235,13 +239,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
 
     // 6. Buscar auditorías previas del producto (múltiples estrategias)
     let previousAudit = null;
-    
-    console.log('🔍 Buscando auditoría para dossier:', { 
-        product_id: dossier.product_id, 
+
+    console.log('🔍 Buscando auditoría para dossier:', {
+        product_id: dossier.product_id,
         product_name: dossier.product_name,
-        lab_id: dossier.lab_id 
+        lab_id: dossier.lab_id
     });
-    
+
     // Estrategia 1: Buscar por product_id si existe
     if (dossier.product_id) {
         const { data: auditData } = await supabase
@@ -251,13 +255,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-        
+
         if (auditData) {
             previousAudit = auditData;
             console.log('📋 Auditoría encontrada por product_id:', auditData.id);
         }
     }
-    
+
     // Estrategia 2: Buscar por nombre del producto (coincidencia parcial)
     if (!previousAudit && dossier.product_name) {
         const { data: auditByName } = await supabase
@@ -267,13 +271,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-        
+
         if (auditByName) {
             previousAudit = auditByName;
             console.log('📋 Auditoría encontrada por nombre:', auditByName.id);
         }
     }
-    
+
     // Estrategia 3: Buscar por lab_id Y nombre del producto (más específico)
     if (!previousAudit && dossier.lab_id && dossier.product_name) {
         const { data: auditByLabAndName } = await supabase
@@ -284,13 +288,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-        
+
         if (auditByLabAndName) {
             previousAudit = auditByLabAndName;
             console.log('📋 Auditoría encontrada por lab_id + nombre:', auditByLabAndName.id);
         }
     }
-    
+
     console.log('📋 Resultado búsqueda auditoría:', previousAudit ? 'ENCONTRADA' : 'NO ENCONTRADA');
 
     return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} previousAudit={previousAudit} />;

@@ -39,6 +39,8 @@ interface Document {
     version: number;
     uploaded_at: string;
     status: string;
+    uploaded_by?: string;
+    profiles?: { full_name: string };
     ai_document_analyses?: AIAnalysis[];
     technical_reviews?: TechnicalReview[];
 }
@@ -113,31 +115,31 @@ function getModuleColors(moduleName: string): { bg: string; border: string; text
 // Helper: Formatear análisis JSON a texto legible (con traducciones)
 function formatAnalysisToText(data: any, t: (key: string) => string): string {
     if (!data) return t('ai.noData') || 'Sin datos de análisis';
-    
+
     let text = '';
-    
+
     // Conclusión principal
     if (data.conclusion || data.conclusión) {
         text += `📋 ${t('ai.conclusion')}\n${data.conclusion || data.conclusión}\n\n`;
     }
-    
+
     // Estado de la etapa
     if (data.estado_etapa) {
         const emoji = data.estado_etapa === 'COMPLETA' ? '✅' : data.estado_etapa === 'OBSERVADA' ? '⚠️' : '❌';
         text += `${emoji} ${t('ai.status')}: ${data.estado_etapa}\n\n`;
     }
-    
+
     // Tipo de documento detectado
     if (data.tipo_detectado) {
         text += `📄 ${t('ai.typeDetected')}: ${data.tipo_detectado}\n`;
     }
-    
+
     // Coincidencia con requisito
     if (typeof data.coincide_con_requisito === 'boolean') {
         const yesNo = data.coincide_con_requisito ? t('ai.yes') : t('ai.no');
         text += `${data.coincide_con_requisito ? '✅' : '❌'} ${t('ai.matchesRequirement')}: ${yesNo}\n\n`;
     }
-    
+
     // Archivos analizados
     if (data.archivos_analizados?.length) {
         text += `📁 ${t('ai.filesAnalyzed')} (${data.archivos_analizados.length})\n`;
@@ -156,7 +158,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
         });
         text += '\n';
     }
-    
+
     // Datos para cruce
     if (data.datos_para_cruce) {
         const cruce = data.datos_para_cruce;
@@ -167,7 +169,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
         if (cruce.fabricantes_detectados?.length) text += `   ${t('ai.manufacturers')}: ${cruce.fabricantes_detectados.join(', ')}\n`;
         text += '\n';
     }
-    
+
     // Validaciones
     if (data.validaciones) {
         const v = data.validaciones;
@@ -194,7 +196,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
             text += '\n';
         }
     }
-    
+
     // Alertas
     if (data.alertas?.length) {
         text += `🔔 ${t('ai.alerts')}\n`;
@@ -204,7 +206,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
         });
         text += '\n';
     }
-    
+
     // Fechas legacy
     if (data.fecha_emision && !data.archivos_analizados) {
         text += `📅 ${t('ai.issueDate')}: ${data.fecha_emision}\n`;
@@ -212,7 +214,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
     if (data.fecha_vencimiento && !data.archivos_analizados) {
         text += `📅 ${t('ai.expiryDate')}: ${data.fecha_vencimiento}\n`;
     }
-    
+
     // Meta info
     if (data._meta) {
         text += `\n─────────────────────────────────────────\n`;
@@ -222,7 +224,7 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
             text += `ℹ️ ${t('ai.files')}: ${data._meta.filesAnalyzed.join(', ')}\n`;
         }
     }
-    
+
     return text || JSON.stringify(data, null, 2);
 }
 
@@ -241,7 +243,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
     const [reviewNotes, setReviewNotes] = useState(''); // Legacy state support
     const [jsonModalData, setJsonModalData] = useState<any | null>(null);
     const [showAuditDetails, setShowAuditDetails] = useState(false);
-    
+
     // Estado para comentario del laboratorio
     const [labCommentItemId, setLabCommentItemId] = useState<string | null>(null);
     const [labCommentText, setLabCommentText] = useState('');
@@ -287,11 +289,11 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
     const totalItems = items.length;
     const uploadedItems = items.filter(i => i.status === 'uploaded' || i.status === 'approved' || i.status === 'observed').length;
     const uploadProgress = totalItems > 0 ? Math.round((uploadedItems / totalItems) * 100) : 0;
-    
+
     // Progress - Documentos aprobados por técnico
     const approvedItems = items.filter(i => i.status === 'approved').length;
     const approvalProgress = totalItems > 0 ? Math.round((approvedItems / totalItems) * 100) : 0;
-    
+
     // Progress - Documentos observados (con problemas)
     const observedItems = items.filter(i => i.status === 'observed').length;
     const observedProgress = totalItems > 0 ? Math.round((observedItems / totalItems) * 100) : 0;
@@ -303,8 +305,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
             const result = await saveLabComment(itemId, labCommentText, locale, dossier.lab_id);
             if (result.success) {
                 // Actualizar el estado local
-                setItems(prev => prev.map(item => 
-                    item.id === itemId 
+                setItems(prev => prev.map(item =>
+                    item.id === itemId
                         ? { ...item, lab_comment_json: result.data }
                         : item
                 ));
@@ -370,24 +372,24 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
 
         setUploadingItemId(dossierItemId);
         const supabase = createClient();
-        
+
         try {
             const currentItem = items.find(i => i.id === dossierItemId);
             const isMultiFile = currentItem?.checklist_item?.allows_multiple_files || false;
             const itemCode = currentItem?.checklist_item.code || 'unknown';
-            
+
             const uploadedDocs: Document[] = [];
-            
+
             // Procesar cada archivo
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                
+
                 // Para multi-archivo: cada archivo es independiente (no versiones)
                 // Para archivo único: incrementar versión
-                const nextVersion = isMultiFile 
-                    ? 1 
+                const nextVersion = isMultiFile
+                    ? 1
                     : (currentItem?.documents?.[0]?.version || 0) + 1;
-                
+
                 const fileIndex = isMultiFile ? `_f${(currentItem?.documents?.length || 0) + i + 1}` : '';
                 // Sanitizar nombre de archivo: remover caracteres especiales
                 const sanitizedFileName = file.name
@@ -399,7 +401,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                 const { error: uploadError } = await supabase.storage
                     .from('dossier-documents')
                     .upload(filePath, file);
-                    
+
                 if (uploadError) throw uploadError;
 
                 const { data: docData, error: dbError } = await supabase
@@ -431,12 +433,12 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                 }
                 return i;
             }));
-            
-            const msg = files.length > 1 
+
+            const msg = files.length > 1
                 ? `${files.length} archivos subidos correctamente.`
                 : `Archivo subido correctamente.`;
             alert(msg);
-            
+
         } catch (error: any) {
             alert('Error: ' + error.message);
         } finally {
@@ -524,36 +526,41 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
 
     const handleDeleteDocument = async (docId: string, filePath: string, dossierItemId: string) => {
         if (!confirm('¿Está seguro de eliminar este documento? Esta acción no se puede deshacer.')) return;
-        
+
         setDeletingDocId(docId);
         const supabase = createClient();
-        
+
         try {
             // 1. Eliminar archivo del storage
             const { error: storageError } = await supabase.storage
                 .from('dossier-documents')
                 .remove([filePath]);
-            
+
             if (storageError) {
                 console.warn('Error eliminando archivo del storage:', storageError);
             }
-            
-            // 2. Eliminar registro de la base de datos
+
+            // 2. "Eliminar" registro de la base de datos (Soft Delete)
+            const { data: { user } } = await supabase.auth.getUser();
             const { error: dbError } = await supabase
                 .from('documents')
-                .delete()
+                .update({
+                    status: 'deleted',
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: user?.id
+                })
                 .eq('id', docId);
-            
+
             if (dbError) throw dbError;
-            
+
             // 3. Actualizar estado del dossier_item a 'pending' si no quedan documentos
             const currentItem = items.find(i => i.id === dossierItemId);
             const remainingDocs = (currentItem?.documents || []).filter(d => d.id !== docId);
-            
+
             if (remainingDocs.length === 0) {
                 await supabase.from('dossier_items').update({ status: 'pending' }).eq('id', dossierItemId);
             }
-            
+
             // 4. Actualizar UI
             setItems(prev => prev.map(i => {
                 if (i.id === dossierItemId) {
@@ -566,7 +573,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                 }
                 return i;
             }));
-            
+
             alert('Documento eliminado correctamente.');
         } catch (error: any) {
             alert('Error al eliminar: ' + error.message);
@@ -732,24 +739,22 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {previousAudit.stages_found?.map((stage, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            className={`p-3 rounded-lg border ${
-                                                stage.status === 'complete' ? 'bg-green-50 border-green-200' :
+                                        <div
+                                            key={idx}
+                                            className={`p-3 rounded-lg border ${stage.status === 'complete' ? 'bg-green-50 border-green-200' :
                                                 stage.status === 'incomplete' ? 'bg-amber-50 border-amber-200' :
-                                                'bg-gray-50 border-gray-200'
-                                            }`}
+                                                    'bg-gray-50 border-gray-200'
+                                                }`}
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div>
                                                     <span className="font-semibold text-sm">{stage.stage_code}</span>
                                                     <p className="text-xs text-gray-600">{stage.stage_name}</p>
                                                 </div>
-                                                <span className={`text-xs px-2 py-0.5 rounded ${
-                                                    stage.status === 'complete' ? 'bg-green-200 text-green-800' :
+                                                <span className={`text-xs px-2 py-0.5 rounded ${stage.status === 'complete' ? 'bg-green-200 text-green-800' :
                                                     stage.status === 'incomplete' ? 'bg-amber-200 text-amber-800' :
-                                                    'bg-gray-200 text-gray-800'
-                                                }`}>
+                                                        'bg-gray-200 text-gray-800'
+                                                    }`}>
                                                     {stage.status === 'complete' ? t('audit.complete') : stage.status === 'incomplete' ? t('audit.incomplete') : stage.status}
                                                 </span>
                                             </div>
@@ -768,20 +773,18 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                     </h4>
                                     <div className="space-y-2">
                                         {previousAudit.problems_found.map((problem, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className={`p-3 rounded-lg border ${
-                                                    problem.type === 'critical' ? 'bg-red-50 border-red-200' :
+                                            <div
+                                                key={idx}
+                                                className={`p-3 rounded-lg border ${problem.type === 'critical' ? 'bg-red-50 border-red-200' :
                                                     problem.type === 'warning' ? 'bg-amber-50 border-amber-200' :
-                                                    'bg-blue-50 border-blue-200'
-                                                }`}
+                                                        'bg-blue-50 border-blue-200'
+                                                    }`}
                                             >
                                                 <div className="flex items-start gap-2">
-                                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                                        problem.type === 'critical' ? 'bg-red-200 text-red-800' :
+                                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${problem.type === 'critical' ? 'bg-red-200 text-red-800' :
                                                         problem.type === 'warning' ? 'bg-amber-200 text-amber-800' :
-                                                        'bg-blue-200 text-blue-800'
-                                                    }`}>
+                                                            'bg-blue-200 text-blue-800'
+                                                        }`}>
                                                         {problem.type === 'critical' ? `🔴 ${t('audit.critical')}` : problem.type === 'warning' ? `🟡 ${t('audit.warning')}` : `🔵 ${t('audit.info')}`}
                                                     </span>
                                                     {problem.stage_code && (
@@ -809,8 +812,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         {previousAudit.stages_missing.map((stage, idx) => (
-                                            <div 
-                                                key={idx} 
+                                            <div
+                                                key={idx}
                                                 className="p-2 rounded-lg border border-amber-200 bg-amber-50"
                                             >
                                                 <div className="flex items-start justify-between">
@@ -932,7 +935,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                             {/* 2. Panel Expandido (Los 4 Bloques) */}
                                             {isExpanded && (
                                                 <div className="px-4 pb-6 bg-gray-50 border-t border-gray-100 animate-in slide-in-from-top-1">
-                                                    
+
                                                     {/* Instrucciones de la etapa - Solo visible para super_admin y usuarios del laboratorio */}
                                                     {['super_admin', 'lab_admin', 'lab_uploader', 'lab_viewer'].includes(userRole) && (
                                                         <div className="mt-3 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -984,7 +987,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                     </button>
                                                                 )}
                                                             </div>
-                                                            
+
                                                             {labCommentItemId === item.id ? (
                                                                 <div className="space-y-2">
                                                                     <textarea
@@ -1066,17 +1069,17 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                     {/* Botón Agregar para multi-archivo */}
                                                                     {checkItem.allows_multiple_files && isUploader && item.status !== 'approved' && (
                                                                         <>
-                                                                            <input 
-                                                                                type="file" 
-                                                                                id={`addfile-${item.id}`} 
-                                                                                className="hidden" 
-                                                                                accept=".pdf,.doc,.docx,.zip" 
+                                                                            <input
+                                                                                type="file"
+                                                                                id={`addfile-${item.id}`}
+                                                                                className="hidden"
+                                                                                accept=".pdf,.doc,.docx,.zip"
                                                                                 multiple
-                                                                                onChange={(e) => handleFileUpload(e, item.id)} 
-                                                                                disabled={uploadingItemId === item.id} 
+                                                                                onChange={(e) => handleFileUpload(e, item.id)}
+                                                                                disabled={uploadingItemId === item.id}
                                                                             />
-                                                                            <label 
-                                                                                htmlFor={`addfile-${item.id}`} 
+                                                                            <label
+                                                                                htmlFor={`addfile-${item.id}`}
                                                                                 className="text-xs btn-primary py-1 px-3 flex items-center gap-1 cursor-pointer bg-green-600 hover:bg-green-700"
                                                                             >
                                                                                 <Upload size={14} /> Agregar archivo
@@ -1084,7 +1087,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                         </>
                                                                     )}
                                                                 </div>
-                                                                
+
                                                                 {/* Lista de documentos */}
                                                                 <div className={`space-y-3 ${checkItem.allows_multiple_files && item.documents?.length > 2 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}>
                                                                     {(checkItem.allows_multiple_files ? item.documents : [currentDoc]).map((doc, docIndex) => (
@@ -1097,7 +1100,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                                     {doc.file_path.split('/').pop()}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500">
-                                                                                    {checkItem.allows_multiple_files ? `Archivo ${docIndex + 1}` : `Versión ${doc.version}`} • {new Date(doc.uploaded_at).toLocaleDateString()}
+                                                                                    {checkItem.allows_multiple_files ? `Archivo ${docIndex + 1}` : `Versión ${doc.version}`} • {new Date(doc.uploaded_at).toLocaleDateString()} • {doc.profiles?.full_name || 'Usuario'}
                                                                                 </p>
                                                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                                                     <button
@@ -1152,11 +1155,10 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                                         <div className="flex items-center gap-1 text-xs text-purple-700 font-medium">
                                                                                             <Bot size={12} />
                                                                                             <span>Análisis Administrador</span>
-                                                                                            <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] ${
-                                                                                                doc.ai_document_analyses[0].status === 'approved' ? 'bg-green-100 text-green-700' :
+                                                                                            <span className={`ml-auto px-1.5 py-0.5 rounded text-[10px] ${doc.ai_document_analyses[0].status === 'approved' ? 'bg-green-100 text-green-700' :
                                                                                                 doc.ai_document_analyses[0].status === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-                                                                                                'bg-red-100 text-red-700'
-                                                                                            }`}>
+                                                                                                    'bg-red-100 text-red-700'
+                                                                                                }`}>
                                                                                                 {doc.ai_document_analyses[0].status}
                                                                                             </span>
                                                                                         </div>
@@ -1174,15 +1176,13 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                             </div>
 
                                                             {/* Bloque B: Estado del Requisito - Dinámico según estado */}
-                                                            <div className={`p-4 rounded-lg border-2 shadow-sm flex flex-col justify-center items-center text-center ${
-                                                                item.status === 'approved' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300' :
+                                                            <div className={`p-4 rounded-lg border-2 shadow-sm flex flex-col justify-center items-center text-center ${item.status === 'approved' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300' :
                                                                 item.status === 'observed' ? 'bg-gradient-to-br from-red-50 to-orange-50 border-red-300' :
-                                                                'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300'
-                                                            }`}>
-                                                                <h4 className={`text-xs font-bold uppercase mb-3 tracking-wide w-full text-left flex items-center gap-2 ${
-                                                                    item.status === 'approved' ? 'text-green-700' :
+                                                                    'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300'
+                                                                }`}>
+                                                                <h4 className={`text-xs font-bold uppercase mb-3 tracking-wide w-full text-left flex items-center gap-2 ${item.status === 'approved' ? 'text-green-700' :
                                                                     item.status === 'observed' ? 'text-red-700' : 'text-amber-700'
-                                                                }`}><span className="text-base">{item.status === 'approved' ? '✅' : item.status === 'observed' ? '⚠️' : '⏳'}</span>{t('dossiers.detail.blockB')}</h4>
+                                                                    }`}><span className="text-base">{item.status === 'approved' ? '✅' : item.status === 'observed' ? '⚠️' : '⏳'}</span>{t('dossiers.detail.blockB')}</h4>
 
                                                                 <div className={`
                                                                 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 mb-2
@@ -1197,8 +1197,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
 
                                                                 {/* Mensaje detallado de estado / acción requerida */}
                                                                 <p className={`text-sm font-medium ${item.status === 'observed' ? 'text-red-600' :
-                                                                        item.status === 'uploaded' ? 'text-blue-600' :
-                                                                            'text-green-600'
+                                                                    item.status === 'uploaded' ? 'text-blue-600' :
+                                                                        'text-green-600'
                                                                     }`}>
                                                                     {item.status === 'uploaded' && t('dossiers.detail.pendingReview')}
                                                                     {item.status === 'observed' && t('dossiers.detail.pendingCorrection')}

@@ -81,11 +81,12 @@ ARCSAPP/
 │ code (A-01, etc)│     │ dossier_id (FK) │     │ id (UUID)       │
 │ module          │     │ status          │     │ file_path       │
 │ title_i18n_json │     │ id (UUID)       │     │ version         │
-│ required        │     └─────────────────┘     │ status          │
-│ critical        │                             │ uploaded_at     │
-│ allows_multiple │                             └────────┬────────┘
-│ ai_prompt       │                                      │
-└─────────────────┘                             ┌────────┴────────┐
+│ required        │     │ lab_comment_json│     │ status (active/ │
+│ critical        │     └─────────────────┘     │   deleted)      │
+│ allows_multiple │                             │ uploaded_at     │
+│ ai_prompt       │                             └────────┬────────┘
+└─────────────────┘                                      │
+                                                ┌────────┴────────┐
                                                 ▼                 ▼
                               ┌─────────────────────┐  ┌─────────────────────┐
                               │ai_document_analyses │  │ technical_reviews   │
@@ -105,6 +106,27 @@ ARCSAPP/
 - `lab_uploader`: Solo puede subir documentos
 - `lab_viewer`: Solo lectura
 - `reviewer`: Revisor externo (técnico/químico)
+
+---
+
+## Características Recientes
+
+### Activity Feed Contextual (Feed de Actividad)
+Se ha implementado un sistema de registro de actividad avanzado mediante el RPC funcion `get_recent_activity`.
+
+**Características:**
+1. **Contexto de Etapa**: Muestra el código (ej. A-01) y título de la etapa para cada actividad.
+2. **Documentos**:
+   - `document_uploaded`: Subida de nuevas versiones.
+   - `document_deleted`: Eliminación de documentos (Soft Delete con ícono de basura).
+3. **Revisiones Técnicas**:
+   - `review_added`: Nuevos dictámenes (Aprobado/Observado) con distinción visual.
+4. **Comentarios**:
+   - `lab_comment`: Actualizaciones en los comentarios del laboratorio.
+
+**Implementación Técnica:**
+- Base de datos: `get_recent_activity` usa `UNION ALL` para combinar eventos de dossiers, documentos, revisiones y comentarios.
+- Frontend: `RecentActivityFeed.tsx` renderiza estos eventos con badges e íconos específicos.
 
 ---
 
@@ -144,7 +166,7 @@ ARCSAPP/
 ```typescript
 export async function runAIAnalysis(documentId: string) {
     // 1. Obtener documento y metadatos de la etapa
-    // 2. Detectar si es etapa MULTI-FILE (A-02, B-02, C-01, etc.)
+    // 2. Detectar si es etapa MULTI-FILE (A-02, B-01, B-02, etc.)
     // 3. Si MULTI: traer TODOS los documentos del dossier_item
     // 4. Convertir PDFs a base64 y enviar como input_file
     // 5. Usar OpenAI Responses API (soporta PDFs escaneados)
@@ -187,18 +209,11 @@ const MULTI_FILE_STAGES = ['A-02', 'B-01', 'B-02', 'B-07', 'B-08', 'B-09', 'C-01
 ├────────────────────────────────────────────────────────────┤
 │  MÓDULO: Efficacy (verde) 💊                               │
 │  └── C-01: Estudios de Estabilidad [MULTI-ARCHIVO]         │
+│  └── C-02: Conclusión de Vida Útil                         │
 └────────────────────────────────────────────────────────────┘
 ```
 
-### Estados Importantes
-```typescript
-const [items, setItems] = useState<DossierItem[]>(initialItems);
-const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-const [analyzingDocId, setAnalyzingDocId] = useState<string | null>(null);
-const [jsonModalData, setJsonModalData] = useState<any | null>(null);
-```
-
-### Helpers
+### Estados y Helpers
 - `getModuleColors(moduleName)`: Retorna colores específicos por módulo
 - `formatAnalysisToText(data, t)`: Convierte JSON de análisis a texto legible traducido
 
@@ -269,26 +284,4 @@ npx supabase logs
 
 ---
 
-## Notas para Futuras Modificaciones
-
-1. **Agregar nueva etapa al checklist**: 
-   - Insertar en `checklist_items` con código único
-   - Si es multi-archivo, agregar a `MULTI_FILE_STAGES` en `prompts-arcsa.ts`
-   - Agregar traducciones en `stageInstructions` de cada idioma
-
-2. **Modificar análisis IA**:
-   - Archivo principal: `app/[locale]/app/dossiers/actions/ai-analysis.ts`
-   - Prompts: `lib/ai/prompts-arcsa.ts`
-   - Modelo usado: `gpt-4o-mini` con Responses API
-
-3. **Agregar nuevo módulo/color**:
-   - Actualizar `getModuleColors()` en `DossierDetailClient.tsx`
-   - Agregar traducciones en `dossiers.modules`
-
-4. **Nuevas traducciones**:
-   - Agregar keys en `messages/es.json` y `messages/en.json`
-   - Otros idiomas opcionales
-
----
-
-*Última actualización: Enero 2026*
+*Última actualización: 30 de Enero de 2026*

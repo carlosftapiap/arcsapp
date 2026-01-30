@@ -3,8 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
 
-// @ts-ignore
-const pdfParse = require('pdf-parse');
+import pdfParse from '@/lib/pdf-parse';
 
 /**
  * Configuración para auditoría de documentos grandes

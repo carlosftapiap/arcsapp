@@ -9,8 +9,7 @@ import {
     buildCompletePrompt, 
     isMultiFileStage,
 } from '@/lib/ai/prompts-arcsa';
-// @ts-ignore
-const pdf = require('pdf-parse');
+import pdfParse from '@/lib/pdf-parse';
 // @ts-ignore
 const mammoth = require('mammoth');
 

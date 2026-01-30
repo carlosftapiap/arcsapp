@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { FolderOpen, Plus, Calendar, ArrowRight, Package, Building2, ClipboardList, AlertCircle, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import RecentActivityFeed from './components/RecentActivityFeed';
 
 interface Product {
     id: string;
@@ -63,6 +64,7 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
     const [selectedProductId, setSelectedProductId] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [showActivity, setShowActivity] = useState(true); // Toggle para mostrar/ocultar actividad
 
     // Flag to ignore initial render
     const [isFirstRender, setIsFirstRender] = useState(true);
@@ -208,14 +210,14 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
     const handleDeleteDossier = async (e: React.MouseEvent, dossierId: string, productName: string) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (!confirm(`¿Estás seguro de eliminar el dossier "${productName}"?\n\nEsta acción eliminará todos los documentos y revisiones asociadas.`)) {
             return;
         }
 
         try {
             const supabase = createClient();
-            
+
             // Eliminar dossier (los items se eliminan en cascada por FK)
             const { error } = await supabase
                 .from('dossiers')
@@ -226,10 +228,10 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
 
             // Actualizar lista local y recargar datos del laboratorio
             setDossiers(dossiers.filter(d => d.id !== dossierId));
-            
+
             // Recargar página para actualizar contadores del dashboard
             router.refresh();
-            
+
         } catch (error: any) {
             console.error('Error al eliminar:', error);
             alert('Error al eliminar el dossier: ' + error.message);
@@ -237,6 +239,7 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
     };
 
     const canDelete = userRole === 'super_admin';
+    const isReviewerOrAdmin = userRole === 'reviewer' || userRole === 'super_admin' || userRole === 'lab_admin';
 
     return (
         <div className="space-y-6">
@@ -287,59 +290,148 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                 </div>
             )}
 
-            {/* Dashboard para Revisores: Resumen de Labs con Dossiers */}
-            {(userRole === 'reviewer' || userRole === 'super_admin') && labsDashboard && labsDashboard.length > 0 && (
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                        <ClipboardList className="text-indigo-600" size={20} />
-                        <h2 className="text-lg font-bold text-indigo-900">Panel de Revisión por Laboratorio</h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {labsDashboard.map(lab => {
-                            // Calcular contadores dinámicamente para el lab actual
-                            const isCurrentLab = lab.id === currentLabId;
-                            const dossierCount = isCurrentLab ? dossiers.length : lab.dossier_count;
-                            const pendingCount = isCurrentLab 
-                                ? dossiers.filter(d => d.status === 'draft' || d.status === 'in_progress').length 
-                                : lab.pending_review;
-                            
-                            return (
-                                <button
-                                    key={lab.id}
-                                    onClick={() => setCurrentLabId(lab.id)}
-                                    className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-                                        currentLabId === lab.id 
-                                            ? 'bg-white border-indigo-500 shadow-md' 
-                                            : 'bg-white/70 border-transparent hover:border-indigo-300'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className={`font-semibold truncate ${currentLabId === lab.id ? 'text-indigo-700' : 'text-gray-800'}`}>
-                                                {lab.name}
-                                            </h3>
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                {dossierCount} {dossierCount === 1 ? 'dossier' : 'dossiers'}
-                                            </p>
+            {/* Layout principal: Grid + Sidebar */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* Columna Principal (Dossiers y Dashboard) */}
+                <div className="lg:col-span-2 space-y-6">
+
+                    {/* Dashboard para Revisores: Resumen de Labs con Dossiers */}
+                    {(userRole === 'reviewer' || userRole === 'super_admin') && labsDashboard && labsDashboard.length > 0 && (
+                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ClipboardList className="text-indigo-600" size={20} />
+                                <h2 className="text-lg font-bold text-indigo-900">Panel de Revisión por Laboratorio</h2>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {labsDashboard.map(lab => {
+                                    // Calcular contadores dinámicamente para el lab actual
+                                    const isCurrentLab = lab.id === currentLabId;
+                                    const dossierCount = isCurrentLab ? dossiers.length : lab.dossier_count;
+                                    const pendingCount = isCurrentLab
+                                        ? dossiers.filter(d => d.status === 'draft' || d.status === 'in_progress').length
+                                        : lab.pending_review;
+
+                                    return (
+                                        <button
+                                            key={lab.id}
+                                            onClick={() => setCurrentLabId(lab.id)}
+                                            className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${currentLabId === lab.id
+                                                    ? 'bg-white border-indigo-500 shadow-md'
+                                                    : 'bg-white/70 border-transparent hover:border-indigo-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className={`font-semibold truncate ${currentLabId === lab.id ? 'text-indigo-700' : 'text-gray-800'}`}>
+                                                        {lab.name}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {dossierCount} {dossierCount === 1 ? 'dossier' : 'dossiers'}
+                                                    </p>
+                                                </div>
+                                                {pendingCount > 0 && (
+                                                    <span className="flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">
+                                                        <AlertCircle size={12} />
+                                                        {pendingCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {pendingCount > 0 && (
+                                                <p className="text-[10px] text-amber-600 mt-2">
+                                                    {pendingCount} pendiente{pendingCount > 1 ? 's' : ''} de revisión
+                                                </p>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Grid de Dossiers */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {dossiers.map(dossier => (
+                            <Link key={dossier.id} href={`/${locale}/app/dossiers/${dossier.id}`} className="block">
+                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all group hover:border-blue-300 relative overflow-hidden">
+                                    {/* Status Stripe */}
+                                    <div className={`absolute top-0 left-0 w-1 h-full ${dossier.status === 'ready' ? 'bg-purple-500' :
+                                        dossier.status === 'submitted' ? 'bg-green-500' :
+                                            dossier.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
+                                        }`} />
+
+                                    <div className="flex justify-between items-start mb-3 pl-2">
+                                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                            <FolderOpen size={24} />
                                         </div>
-                                        {pendingCount > 0 && (
-                                            <span className="flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">
-                                                <AlertCircle size={12} />
-                                                {pendingCount}
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusColor(dossier.status)} uppercase tracking-wide`}>
+                                                {getStatusLabel(dossier.status)}
                                             </span>
-                                        )}
+                                            {canDelete && (
+                                                <button
+                                                    onClick={(e) => handleDeleteDossier(e, dossier.id, dossier.product_name)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Eliminar dossier"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    {pendingCount > 0 && (
-                                        <p className="text-[10px] text-amber-600 mt-2">
-                                            {pendingCount} pendiente{pendingCount > 1 ? 's' : ''} de revisión
+
+                                    <div className="pl-2">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-1 truncate group-hover:text-blue-700 transition-colors">
+                                            {dossier.product_name}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 mb-4 flex items-center">
+                                            <Package size={12} className="mr-1" />
+                                            {t(`productTypes.${dossier.product_type}`) || dossier.product_type}
                                         </p>
-                                    )}
-                                </button>
-                            );
-                        })}
+
+                                        <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
+                                            <div className="flex items-center">
+                                                <Calendar size={12} className="mr-1" />
+                                                {new Date(dossier.created_at).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US')}
+                                            </div>
+                                            <div className="flex items-center text-blue-500 font-medium group-hover:translate-x-1 transition-transform">
+                                                Ver detalles <ArrowRight size={12} className="ml-1" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+
+                        {/* Empty State Action Card */}
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-600 gap-3 min-h-[180px]"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
+                                <Plus size={24} />
+                            </div>
+                            <span className="font-medium">Crear nuevo Dossier</span>
+                        </button>
                     </div>
+
+                    {dossiers.length === 0 && !refreshing && (
+                        <div className="text-center py-12">
+                            <p className="text-gray-400 text-sm">No hay expedientes activos en este laboratorio.</p>
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {/* Columna Lateral (Activity Feed) */}
+                <div className="lg:col-span-1 space-y-6">
+                    {/* Solo mostrar si es admin/revisor o si el usuario quiere verlo */}
+                    {isReviewerOrAdmin && (
+                        <RecentActivityFeed labId={currentLabId} />
+                    )}
+
+                    {/* Otros widgets futuros podrían ir aquí */}
+                </div>
+            </div>
 
             {/* Modal Crear Dossier */}
             {showCreateModal && (
@@ -394,80 +486,6 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Grid de Dossiers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {dossiers.map(dossier => (
-                    <Link key={dossier.id} href={`/${locale}/app/dossiers/${dossier.id}`} className="block">
-                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all group hover:border-blue-300 relative overflow-hidden">
-                            {/* Status Stripe */}
-                            <div className={`absolute top-0 left-0 w-1 h-full ${dossier.status === 'ready' ? 'bg-purple-500' :
-                                dossier.status === 'submitted' ? 'bg-green-500' :
-                                    dossier.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
-                                }`} />
-
-                            <div className="flex justify-between items-start mb-3 pl-2">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
-                                    <FolderOpen size={24} />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusColor(dossier.status)} uppercase tracking-wide`}>
-                                        {getStatusLabel(dossier.status)}
-                                    </span>
-                                    {canDelete && (
-                                        <button
-                                            onClick={(e) => handleDeleteDossier(e, dossier.id, dossier.product_name)}
-                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                            title="Eliminar dossier"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="pl-2">
-                                <h3 className="text-lg font-bold text-gray-900 mb-1 truncate group-hover:text-blue-700 transition-colors">
-                                    {dossier.product_name}
-                                </h3>
-                                <p className="text-xs text-gray-500 mb-4 flex items-center">
-                                    <Package size={12} className="mr-1" />
-                                    {t(`productTypes.${dossier.product_type}`) || dossier.product_type}
-                                </p>
-
-                                <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
-                                    <div className="flex items-center">
-                                        <Calendar size={12} className="mr-1" />
-                                        {new Date(dossier.created_at).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US')}
-                                    </div>
-                                    <div className="flex items-center text-blue-500 font-medium group-hover:translate-x-1 transition-transform">
-                                        Ver detalles <ArrowRight size={12} className="ml-1" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
-                ))}
-
-                {/* Empty State Action Card */}
-                <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-600 gap-3 min-h-[180px]"
-                >
-                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
-                        <Plus size={24} />
-                    </div>
-                    <span className="font-medium">Crear nuevo Dossier</span>
-                </button>
-            </div>
-
-
-
-            {dossiers.length === 0 && !refreshing && (
-                <div className="text-center py-12">
-                    <p className="text-gray-400 text-sm">No hay expedientes activos en este laboratorio.</p>
                 </div>
             )}
         </div>

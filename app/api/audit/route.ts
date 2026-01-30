@@ -3,8 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
 import { randomUUID } from 'crypto';
 
-// @ts-ignore
-const pdfParse = require('pdf-parse');
+import pdfParse from '@/lib/pdf-parse';
 
 export const maxDuration = 300; // 5 minutos para documentos grandes
 

@@ -123,6 +123,7 @@
             "técnico": "Técnico",
             "calidad": "Calidad",
             "fabricante": "Fabricante",
+            "estabilidad": "Estabilidad",
             "otros": "Otros"
         },
         "items": "{count} ítems",
@@ -361,6 +362,11 @@
             "title": "Documentación Adicional",
             "hint": "Suba cualquier documentación adicional requerida.",
             "evaluates": " SE EVALÚA:\n• Documentación completa\n• Formato correcto\n• Información relevante"
+        },
+        "D-01": {
+            "title": "Dictamen Técnico",
+            "hint": "Suba el dictamen técnico o resolución oficial aprobada.",
+            "evaluates": " SE EVALÚA:\n• Dictamen firmado\n• Conclusión oficial"
         }
     },
     "common": {

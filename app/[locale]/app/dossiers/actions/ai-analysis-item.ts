@@ -3,8 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
 import { buildCompletePrompt, isMultiFileStage } from '@/lib/ai/prompts-arcsa';
-// @ts-ignore
-const pdf = require('pdf-parse');
+import pdfParse from '@/lib/pdf-parse';
 // @ts-ignore
 const mammoth = require('mammoth');
 
@@ -16,12 +15,7 @@ async function extractTextFromFile(buffer: Buffer, filePathLower: string): Promi
     let needsOcr = false;
 
     if (filePathLower.endsWith('.pdf')) {
-        let pdfParser = pdf;
-        // @ts-ignore
-        if (typeof pdfParser !== 'function' && pdfParser.default) {
-            pdfParser = pdfParser.default;
-        }
-        const pdfData = await pdfParser(buffer);
+        const pdfData = await pdfParse(buffer);
         textContent = (pdfData.text || '').slice(0, 8000); // 8k por archivo para multi
         
         // Si hay muy poco texto, probablemente es escaneado
