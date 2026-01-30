@@ -15,6 +15,9 @@ else {
     write-host "WARNING: DIRECT_URL not found in .env"
 }
 
+write-host "Generating Prisma Client..."
+cmd /c "npx prisma generate"
+
 node apply_migration.js
 if ($LASTEXITCODE -eq 0) {
     write-host "Migration applied successfully!"
@@ -22,4 +25,4 @@ if ($LASTEXITCODE -eq 0) {
 else {
     write-host "Migration failed."
 }
-pause
+# pause removed for automation

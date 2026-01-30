@@ -124,7 +124,21 @@
             "calidad": "Calidad",
             "fabricante": "Fabricante",
             "estabilidad": "Estabilidad",
-            "otros": "Otros"
+            "otros": "Otros",
+            "corporativo": "Corporativo",
+            "proveedores": "Proveedores",
+            "regulatorio": "Regulatorio",
+            "comercial": "Comercial",
+            "logística": "Logística",
+            "finanzas": "Finanzas",
+            "documentos técnicos": "Documentos Técnicos",
+            "etapa clínica": "Etapa Clínica",
+            "etapa analítica": "Etapa Analítica",
+            "etapa estadística": "Etapa Estadística",
+            "bioexención": "Bioexención",
+            "estudios extranjeros": "Estudios Extranjeros",
+            "modificaciones": "Modificaciones",
+            "riesgo regulatorio": "Riesgo Regulatorio"
         },
         "items": "{count} ítems",
         "detail": {
@@ -167,7 +181,9 @@
         "medicine_general": "Medicamento General",
         "biologic": "Biológico",
         "device_medical": "Dispositivo Médico",
-        "supplement_food": "Suplemento Alimenticio"
+        "supplement_food": "Suplemento Alimenticio",
+        "corporate_docs": "Documentación Corporativa",
+        "bioequivalence": "Bioequivalencia (BE)"
     },
     "origin": {
         "imported": "Importado",

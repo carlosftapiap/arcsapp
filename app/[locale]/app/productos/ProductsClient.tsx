@@ -257,6 +257,8 @@ export default function ProductsClient({ initialProducts, availableLabs, initial
                                         <option value="biologic">{t('productTypes.biologic')}</option>
                                         <option value="device_medical">{t('productTypes.device_medical')}</option>
                                         <option value="supplement_food">{t('productTypes.supplement_food') || 'Suplemento Alimenticio'}</option>
+                                        <option value="corporate_docs">{t('productTypes.corporate_docs') || 'Documentación Corporativa'}</option>
+                                        <option value="bioequivalence">{t('productTypes.bioequivalence') || 'Bioequivalencia (BE)'}</option>
                                     </select>
                                 </div>
 

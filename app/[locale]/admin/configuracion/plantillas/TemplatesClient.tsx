@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
-import { Plus, Trash2, Edit, ChevronRight, ClipboardList, Save, X, GripVertical, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, ChevronRight, ClipboardList, Save, X, GripVertical, CheckCircle2, AlertCircle, Layout } from 'lucide-react';
+import Link from 'next/link';
 
 interface ChecklistTemplate {
     id: string;
@@ -212,13 +213,22 @@ export default function TemplatesClient({ initialTemplates }: Props) {
                         <ClipboardList size={20} className="mr-2" />
                         Plantillas
                     </h2>
-                    <button
-                        onClick={() => setShowTemplateForm(true)}
-                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        title="Nueva Plantilla"
-                    >
-                        <Plus size={18} />
-                    </button>
+                    <div className="flex gap-1">
+                        <Link
+                            href="/es/admin/configuracion/visual-builder"
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Editor Visual"
+                        >
+                            <Layout size={18} />
+                        </Link>
+                        <button
+                            onClick={() => setShowTemplateForm(true)}
+                            className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            title="Nueva Plantilla"
+                        >
+                            <Plus size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">

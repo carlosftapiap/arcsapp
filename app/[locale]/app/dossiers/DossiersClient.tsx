@@ -79,8 +79,13 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
     }, [currentLabId]);
 
     const loadLabData = async (labId: string) => {
+        if (!labId) {
+            console.warn("loadLabData called without labId");
+            return;
+        }
+
         setRefreshing(true);
-        setDossiers([]); // Limpiar estado previo para evitar confusión
+        // setDossiers([]); // Comentado para evitar parpadeo agresivo
         const supabase = createClient();
 
         console.log("🔄 Recargando datos para Lab ID:", labId);
@@ -317,8 +322,8 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                                             key={lab.id}
                                             onClick={() => setCurrentLabId(lab.id)}
                                             className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${currentLabId === lab.id
-                                                    ? 'bg-white border-indigo-500 shadow-md'
-                                                    : 'bg-white/70 border-transparent hover:border-indigo-300'
+                                                ? 'bg-white border-indigo-500 shadow-md'
+                                                : 'bg-white/70 border-transparent hover:border-indigo-300'
                                                 }`}
                                         >
                                             <div className="flex items-start justify-between">

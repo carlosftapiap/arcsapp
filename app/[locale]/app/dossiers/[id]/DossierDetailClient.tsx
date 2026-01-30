@@ -228,6 +228,30 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
     return text || JSON.stringify(data, null, 2);
 }
 
+
+// Helper para obtener traducciones opcionales sin errores de consola
+function getOptionalTranslation(t: any, key: string): string | null {
+    // Prefijos de códigos que sabemos que NO tienen traducciones en stageInstructions
+    const knownUntranslatedPrefixes = ['LEG-', 'PRO-', 'REG-', 'MKT-', 'LOG-', 'FIN-', 'F-', 'DM-', 'BIO-', 'NEW-'];
+
+    // Si la key contiene alguno de los prefijos conocidos, no intentar traducir
+    if (knownUntranslatedPrefixes.some(prefix => key.includes(prefix))) {
+        return null;
+    }
+
+    try {
+        const result = t(key);
+        // Si la traducción devuelve la misma key, significa que no existe
+        if (result && !result.includes(key.split('.')[0])) {
+            return result;
+        }
+    } catch (e) {
+        // Ignorar silenciosamente
+    }
+    return null;
+}
+
+
 export default function DossierDetailClient({ dossier, initialItems, userRole, previousAudit }: Props) {
     console.log("Rendering DossierDetailClient Clean Reconstruction");
     const t = useTranslations();
@@ -941,26 +965,31 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                         <div className="mt-3 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                                             <p className="text-sm text-blue-800">
                                                                 <span className="font-medium">📋 </span>
-                                                                {t(`stageInstructions.${checkItem.code.replace(/\./g, '-')}.hint`) || 'Suba el documento correspondiente a este requisito.'}
+                                                                {(() => {
+                                                                    const translatedHint = getOptionalTranslation(t, `stageInstructions.${checkItem.code.replace(/\./g, '-')}.hint`);
+                                                                    if (translatedHint) return translatedHint;
+
+                                                                    // Fallback: usar descripción del item o mensaje genérico
+                                                                    const description = (checkItem as any).description_i18n_json?.[locale] || (checkItem as any).description_i18n_json?.['es'];
+                                                                    return description || 'Suba el documento correspondiente a este requisito.';
+                                                                })()}
                                                             </p>
                                                             {/* multiHint deshabilitado temporalmente - solo items específicos lo tienen */}
                                                             {/* Criterios de evaluación */}
                                                             {(() => {
-                                                                try {
-                                                                    const evaluates = t(`stageInstructions.${checkItem.code.replace(/\./g, '-')}.evaluates`);
-                                                                    if (evaluates && !evaluates.includes('stageInstructions.')) {
-                                                                        return (
-                                                                            <details className="mt-3 border-t border-blue-200 pt-2">
-                                                                                <summary className="text-xs font-medium text-blue-900 cursor-pointer hover:text-blue-700">
-                                                                                    🔍 {t('dossiers.detail.viewEvaluationCriteria')}
-                                                                                </summary>
-                                                                                <div className="mt-2 text-xs text-blue-800 whitespace-pre-line bg-blue-100/50 p-2 rounded">
-                                                                                    {evaluates}
-                                                                                </div>
-                                                                            </details>
-                                                                        );
-                                                                    }
-                                                                } catch { return null; }
+                                                                const evaluates = getOptionalTranslation(t, `stageInstructions.${checkItem.code.replace(/\./g, '-')}.evaluates`);
+                                                                if (evaluates) {
+                                                                    return (
+                                                                        <details className="mt-3 border-t border-blue-200 pt-2">
+                                                                            <summary className="text-xs font-medium text-blue-900 cursor-pointer hover:text-blue-700">
+                                                                                🔍 {t('dossiers.detail.viewEvaluationCriteria')}
+                                                                            </summary>
+                                                                            <div className="mt-2 text-xs text-blue-800 whitespace-pre-line bg-blue-100/50 p-2 rounded">
+                                                                                {evaluates}
+                                                                            </div>
+                                                                        </details>
+                                                                    );
+                                                                }
                                                                 return null;
                                                             })()}
                                                         </div>
