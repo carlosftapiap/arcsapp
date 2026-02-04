@@ -6,8 +6,8 @@ export default async function DiagnosticPage() {
     const docs = await prisma.documents.findMany({ select: { uploaded_by: true } });
     const dossiers = await prisma.dossiers.findMany({ select: { created_by: true } });
 
-    const uploaderIds = new Set(docs.map(d => d.uploaded_by).filter(Boolean) as string[]);
-    const creatorIds = new Set(dossiers.map(d => d.created_by).filter(Boolean) as string[]);
+    const uploaderIds = new Set(docs.map((d: { uploaded_by: string | null }) => d.uploaded_by).filter(Boolean) as string[]);
+    const creatorIds = new Set(dossiers.map((d: { created_by: string | null }) => d.created_by).filter(Boolean) as string[]);
 
     const allIds = Array.from(new Set([...uploaderIds, ...creatorIds]));
 
@@ -17,13 +17,13 @@ export default async function DiagnosticPage() {
         select: { user_id: true, full_name: true, email: true }
     });
 
-    const profileMap = new Map(profiles.map(p => [p.user_id, p]));
+    const profileMap = new Map(profiles.map((p: { user_id: string; full_name: string | null; email: string | null }) => [p.user_id, p]));
 
     // 3. Identify missing
     const missingIds = allIds.filter(id => !profileMap.has(id));
 
     // 4. Get Auth User details for missing profiles
-    let missingUsersDetails = [];
+    let missingUsersDetails: { id: string; email: string | null; created_at: Date | null }[] = [];
     if (missingIds.length > 0) {
         missingUsersDetails = await prisma.users.findMany({
             where: { id: { in: missingIds } },
@@ -51,7 +51,7 @@ export default async function DiagnosticPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {missingUsersDetails.map(u => (
+                                {missingUsersDetails.map((u: { id: string; email: string | null; created_at: Date | null }) => (
                                     <tr key={u.id} className="border-b hover:bg-gray-50">
                                         <td className="p-2 font-mono text-xs">{u.id}</td>
                                         <td className="p-2">{u.email}</td>

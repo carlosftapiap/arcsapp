@@ -4,6 +4,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
 const nextConfig = {
+    output: 'standalone',
     images: {
         remotePatterns: [
             {
@@ -24,10 +25,8 @@ const nextConfig = {
                 '127.0.0.1',
                 '192.168.100.28:3000',
                 '192.168.100.28',
-                // Rangos de puertos comunes para proxies
-                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${61300 + i}`),
-                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${58700 + i}`),
-                ...Array.from({length: 100}, (_, i) => `127.0.0.1:${65400 + i}`),
+                'arcsa.evophar.com',
+                'www.arcsa.evophar.com',
             ],
             bodySizeLimit: '50mb',
         },
