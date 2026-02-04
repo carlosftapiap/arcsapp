@@ -1,5 +1,13 @@
 # Despliegue en A2 Hosting - ARCSAPP
 
+## ⚠️ IMPORTANTE: Next.js requiere Node.js
+
+Esta aplicación **NO puede funcionar como archivos estáticos**. Necesita Node.js ejecutándose.
+
+Si subes solo los archivos sin configurar Node.js en A2 Hosting, verás errores como:
+- `MIME type ('text/html') is not executable`
+- `ChunkLoadError: Loading chunk failed`
+
 ## Estructura generada
 
 La carpeta `dist/` contiene todo lo necesario para desplegar en A2 Hosting con Node.js:
@@ -48,23 +56,35 @@ public_html/arcsa.evophar.com/
 └── server.js
 ```
 
-### 3. Configurar Node.js en A2 Hosting
+### 3. Configurar Node.js en A2 Hosting (CRÍTICO)
 
-En el panel de control de A2 Hosting:
+En el panel de control de A2 Hosting (cPanel):
 
-1. Ir a **Setup Node.js App**
-2. Crear nueva aplicación:
-   - **Node.js version**: 18.x o superior
+1. Ir a **Setup Node.js App** (en la sección Software)
+2. Hacer clic en **CREATE APPLICATION**
+3. Configurar:
+   - **Node.js version**: 18.x o superior (recomendado 20.x)
    - **Application mode**: Production
-   - **Application root**: `arcsa.evophar.com`
+   - **Application root**: `arcsa.evophar.com` (la carpeta donde subiste los archivos)
    - **Application URL**: `arcsa.evophar.com`
    - **Application startup file**: `server.js`
 
-3. Configurar variables de entorno en el panel (o usar el archivo .env)
+4. Hacer clic en **CREATE**
 
-4. Hacer clic en **Run NPM Install** (opcional, ya están incluidas las dependencias mínimas)
+5. Una vez creada, en la misma pantalla:
+   - Hacer clic en el ícono de lápiz (editar) de tu aplicación
+   - Ir a la sección **Environment variables**
+   - Agregar las variables de tu `.env` una por una:
+     ```
+     NODE_ENV = production
+     DATABASE_URL = tu_url_de_base_de_datos
+     NEXT_PUBLIC_SUPABASE_URL = tu_url_supabase
+     NEXT_PUBLIC_SUPABASE_ANON_KEY = tu_anon_key
+     ```
 
-5. Hacer clic en **Start App**
+6. Hacer clic en **Run NPM Install** (opcional si ya subiste node_modules)
+
+7. Hacer clic en **RESTART** para iniciar la aplicación
 
 ### 4. Configurar dominio/subdominio
 
