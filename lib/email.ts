@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from './logger';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -80,14 +81,14 @@ export async function sendActivityNotification(activity: ActivityNotification) {
     });
 
     if (error) {
-      console.error('Error sending email notification:', error);
+      logger.error('Error sending email notification', error, { type: activity.type, to: NOTIFICATION_EMAIL });
       return { success: false, error };
     }
 
-    console.log('Email notification sent:', data?.id);
+    logger.info('Email notification sent', { id: data?.id, type: activity.type, to: NOTIFICATION_EMAIL });
     return { success: true, id: data?.id };
   } catch (error) {
-    console.error('Error sending email notification:', error);
+    logger.error('Error sending email notification (catch)', error);
     return { success: false, error };
   }
 }
