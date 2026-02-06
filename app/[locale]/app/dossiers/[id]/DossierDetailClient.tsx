@@ -13,6 +13,7 @@ import { runAIAnalysisV2 } from '@/app/[locale]/app/dossiers/actions/ai-analysis
 import { runAIAnalysisForItem } from '@/app/[locale]/app/dossiers/actions/ai-analysis-item';
 import { saveReviewWithTranslation } from '@/app/[locale]/app/dossiers/actions/translate';
 import { saveLabComment } from '@/app/[locale]/app/dossiers/actions/lab-comment';
+import { notifyDocumentUploaded, notifyDocumentDeleted, notifyCommentAdded } from '@/lib/notify-client';
 
 // Interfaces Actualizadas
 interface AIAnalysis {
@@ -335,6 +336,10 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                         : item
                 ));
                 setLabCommentItemId(null);
+                
+                // Enviar notificación por email
+                notifyCommentAdded(dossier.product_name, labCommentText, 'Usuario');
+                
                 setLabCommentText('');
             } else {
                 alert('Error al guardar comentario: ' + result.error);
@@ -462,6 +467,10 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                 ? `${files.length} archivos subidos correctamente.`
                 : `Archivo subido correctamente.`;
             alert(msg);
+            
+            // Enviar notificación por email
+            const fileName = files.length > 1 ? `${files.length} archivos` : files[0].name;
+            notifyDocumentUploaded(fileName, dossier.product_name, 'Usuario');
 
         } catch (error: any) {
             alert('Error: ' + error.message);
@@ -599,6 +608,10 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
             }));
 
             alert('Documento eliminado correctamente.');
+            
+            // Enviar notificación por email
+            const fileName = filePath.split('/').pop() || 'Documento';
+            notifyDocumentDeleted(fileName, dossier.product_name, 'Usuario');
         } catch (error: any) {
             alert('Error al eliminar: ' + error.message);
         } finally {

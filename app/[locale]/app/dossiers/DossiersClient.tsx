@@ -7,6 +7,7 @@ import { FolderOpen, Plus, Calendar, ArrowRight, Package, Building2, ClipboardLi
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RecentActivityFeed from './components/RecentActivityFeed';
+import { notifyDossierCreated } from '@/lib/notify-client';
 
 interface Product {
     id: string;
@@ -182,6 +183,10 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
             setShowCreateModal(false);
             setDossiers([stringDossier, ...dossiers]);
             setSelectedProductId(''); // Reset selection
+            
+            // Enviar notificación por email
+            notifyDossierCreated(product.nombre_comercial, 'Usuario');
+            
             router.push(`/${locale}/app/dossiers/${stringDossier.id}`);
 
         } catch (error: any) {

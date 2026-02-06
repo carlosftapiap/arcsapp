@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { OpenAI } from 'openai';
+import { notifyAuditCompleted } from '@/lib/email';
 
 import pdfParse from '@/lib/pdf-parse';
 
@@ -368,6 +369,12 @@ export async function runAuditAnalysis(
         console.log(`✅ Auditoría completada en ${(processingTime / 1000).toFixed(1)}s`);
         console.log(`   - Etapas encontradas: ${auditResult.stages_found.length}`);
         console.log(`   - Problemas detectados: ${auditResult.problems_found.length}`);
+        
+        // Enviar notificación por email
+        const criticalCount = auditResult.problems_found.filter(p => p.type === 'critical').length;
+        const warningCount = auditResult.problems_found.filter(p => p.type === 'warning').length;
+        const resultSummary = `${auditResult.stages_found.length} etapas, ${criticalCount} críticos, ${warningCount} advertencias`;
+        await notifyAuditCompleted(fileName, resultSummary, 'Sistema');
         
         return { success: true, data: auditResult };
         
