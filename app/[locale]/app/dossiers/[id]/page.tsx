@@ -40,6 +40,9 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
       id,
       status,
       lab_comment_json,
+      locked,
+      locked_by,
+      locked_at,
       checklist_items:checklist_item_id (
         id, code, module, title_i18n_json, required, critical, sort_order, allows_multiple_files
       ),
@@ -200,7 +203,10 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             status: row.status,
             checklist_item: checklistItem,
             documents: documentsSorted,
-            lab_comment_json: row.lab_comment_json
+            lab_comment_json: row.lab_comment_json,
+            locked: row.locked || false,
+            locked_by: row.locked_by || null,
+            locked_at: row.locked_at || null,
         };
     });
 
@@ -214,17 +220,23 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
     // 5. Determinar Rol del Usuario
     const { data: { user } } = await supabase.auth.getUser();
     let userRole = 'lab_viewer';
+    let activityLogEnabled = true;
 
     if (user) {
         // 1. Primero verificar rol global en profiles (para reviewer y super_admin globales)
         const { data: profileData } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, activity_log_enabled')
             .eq('user_id', user.id)
             .single();
 
-        if (profileData?.role && ['reviewer', 'super_admin', 'tecnico'].includes(profileData.role)) {
-            userRole = profileData.role;
+        if (profileData) {
+            if (profileData.activity_log_enabled !== undefined) {
+                activityLogEnabled = profileData.activity_log_enabled;
+            }
+            if (profileData.role && ['reviewer', 'super_admin', 'tecnico'].includes(profileData.role)) {
+                userRole = profileData.role;
+            }
         } else {
             // 2. Si no es revisor global, buscar rol en el laboratorio específico
             const { data: memberData } = await supabase
@@ -303,5 +315,5 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
 
     console.log('📋 Resultado búsqueda auditoría:', previousAudit ? 'ENCONTRADA' : 'NO ENCONTRADA');
 
-    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} userId={user?.id} previousAudit={previousAudit} />;
+    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} userId={user?.id} previousAudit={previousAudit} activityLogEnabled={activityLogEnabled} />;
 }

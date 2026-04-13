@@ -5,7 +5,8 @@ import { useTranslations, useLocale } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import {
     ChevronLeft, FileText, Upload, CheckCircle2, AlertCircle,
-    Clock, Eye, Trash2, Download, RefreshCw, Bot, X, Languages, FileSearch
+    Clock, Eye, Trash2, Download, RefreshCw, Bot, X, Languages, FileSearch,
+    Lock, LockOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import { runAIAnalysis } from '@/app/[locale]/app/dossiers/actions/ai-analysis';
@@ -16,6 +17,8 @@ import { saveLabComment } from '@/app/[locale]/app/dossiers/actions/lab-comment'
 import { notifyDocumentUploaded, notifyDocumentDeleted, notifyCommentAdded } from '@/lib/notify-client';
 import DossierAssignments from './components/DossierAssignments';
 import DocumentVersionTimeline from './components/DocumentVersionTimeline';
+import DossierActivityLog from './components/DossierActivityLog';
+import { lockDossierItem } from '@/app/[locale]/app/dossiers/actions/lock-item';
 
 // Interfaces Actualizadas
 interface AIAnalysis {
@@ -66,6 +69,9 @@ interface DossierItem {
     documents: Document[]; // Array de docs subidos ordenados por fecha desc
     reviewer_notes?: string; // Legacy support
     review_status?: string; // Legacy support
+    locked?: boolean;
+    locked_by?: string | null;
+    locked_at?: string | null;
     lab_comment_json?: { es?: string; en?: string; hi?: string; 'zh-CN'?: string }; // Comentario del laboratorio
 }
 
@@ -97,6 +103,7 @@ interface Props {
     userRole: string;
     userId?: string;
     previousAudit?: PreviousAudit | null;
+    activityLogEnabled?: boolean;
 }
 
 // Helper: Colores por módulo (tonos más fuertes)
@@ -256,7 +263,7 @@ function getOptionalTranslation(t: any, key: string): string | null {
 }
 
 
-export default function DossierDetailClient({ dossier, initialItems, userRole, userId, previousAudit }: Props) {
+export default function DossierDetailClient({ dossier, initialItems, userRole, userId, previousAudit, activityLogEnabled = true }: Props) {
     console.log("Rendering DossierDetailClient Clean Reconstruction");
     const t = useTranslations();
     const locale = useLocale();
@@ -341,7 +348,9 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                 setLabCommentItemId(null);
                 
                 // Enviar notificación por email
-                notifyCommentAdded(dossier.product_name, labCommentText, 'Usuario');
+                const itemTarget = items.find(i => i.id === itemId);
+                const sectionName = itemTarget?.checklist_item ? `${itemTarget.checklist_item.code} - ${itemTarget.checklist_item.name_es || itemTarget.checklist_item.name || 'Requisito'}` : 'Requisito General';
+                notifyCommentAdded(dossier.product_name, labCommentText, 'Usuario', sectionName);
                 
                 setLabCommentText('');
             } else {
@@ -401,6 +410,14 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, dossierItemId: string) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
+
+        // Verificar si el item está bloqueado
+        const targetItem = items.find(i => i.id === dossierItemId);
+        if (targetItem?.locked) {
+            alert('Este item está bloqueado. No se pueden realizar modificaciones.');
+            e.target.value = '';
+            return;
+        }
 
         setUploadingItemId(dossierItemId);
         const supabase = createClient();
@@ -473,7 +490,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
             
             // Enviar notificación por email
             const fileName = files.length > 1 ? `${files.length} archivos` : files[0].name;
-            notifyDocumentUploaded(fileName, dossier.product_name, 'Usuario');
+            const secName = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${currentItem.checklist_item.name_es || currentItem.checklist_item.name || 'Requisito'}` : 'Requisito General';
+            notifyDocumentUploaded(fileName, dossier.product_name, 'Usuario', secName);
 
         } catch (error: any) {
             alert('Error: ' + error.message);
@@ -609,7 +627,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
             
             // Enviar notificación por email
             const fileName = filePath.split('/').pop() || 'Documento';
-            notifyDocumentDeleted(fileName, dossier.product_name, 'Usuario');
+            const secNameDelete = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${currentItem.checklist_item.name_es || currentItem.checklist_item.name || 'Requisito'}` : 'Requisito General';
+            notifyDocumentDeleted(fileName, dossier.product_name, 'Usuario', secNameDelete);
         } catch (error: any) {
             alert('Error al eliminar: ' + error.message);
         } finally {
@@ -751,6 +770,9 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                     currentUserId={userId}
                 />
             )}
+
+            {/* Historial de actividad del dossier - Visible para todos los roles si está habilitado */}
+            {activityLogEnabled && <DossierActivityLog dossierId={dossier.id} />}
 
             {/* Auditoría - Visible para todos los roles */}
             {previousAudit && (
@@ -936,33 +958,61 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                     const hasDoc = !!currentDoc && currentDoc.status !== 'deleted';
                                     const isExpanded = expandedItemId === item.id;
 
+                                    // Estado de bloqueo
+                                    const isLocked = !!item.locked;
+                                    const canLockItem = userRole === 'super_admin' || userRole === 'tecnico';
+                                    const canUnlockItem = userRole === 'super_admin';
+
                                     // Badges Row Summary
                                     let statusBadges = null;
                                     if (!hasDoc) statusBadges = <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{t('status.pending')}</span>;
                                     else {
                                         statusBadges = (
-                                            <div className="flex gap-2 text-xs">
-                                                {/* Technical Status */}
+                                            <div className="flex gap-2 text-xs items-center">
                                                 {item.status === 'approved' && <span className="bg-green-100 text-green-700 px-2 rounded font-medium flex items-center">{t('status.approved')}</span>}
                                                 {item.status === 'observed' && <span className="bg-red-100 text-red-700 px-2 rounded font-medium flex items-center">{t('status.observed')}</span>}
                                                 {item.status === 'uploaded' && <span className="bg-blue-100 text-blue-700 px-2 rounded font-medium flex items-center">{t('status.uploaded')}</span>}
-
-                                                {/* Version */}
-                                                <span className="bg-gray-100 text-gray-600 px-2 rounded  font-mono">v{currentDoc.version}</span>
+                                                <span className="bg-gray-100 text-gray-600 px-2 rounded font-mono">v{currentDoc.version}</span>
+                                                {isLocked && (
+                                                    <span className="flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-300 px-2 py-0.5 rounded font-medium">
+                                                        <Lock size={10} /> Bloqueado
+                                                    </span>
+                                                )}
                                             </div>
                                         );
                                     }
 
+                                    const handleLockToggle = async (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        if (isLocked && !canUnlockItem) {
+                                            alert('Solo el administrador puede desbloquear este item.');
+                                            return;
+                                        }
+                                        const result = await lockDossierItem(item.id, !isLocked);
+                                        if (result.error) {
+                                            alert('Error: ' + result.error);
+                                        } else {
+                                            setItems(prev => prev.map(i =>
+                                                i.id === item.id ? { ...i, locked: !isLocked } : i
+                                            ));
+                                        }
+                                    };
+
                                     return (
-                                        <div key={item.id} className="group flex flex-col transition-all">
+                                        <div key={item.id} className={`group flex flex-col transition-all ${isLocked ? 'border-l-2 border-amber-300' : ''}`}>
 
                                             {/* 1. Row Resumida (Siempre visible) */}
                                             <div
-                                                className={`p-4 flex gap-4 items-start cursor-pointer hover:bg-gray-50 ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                                                className={`p-4 flex gap-4 items-start cursor-pointer hover:bg-gray-50 ${isExpanded ? 'bg-blue-50/30' : ''} ${isLocked ? 'bg-amber-50/20' : ''}`}
                                                 onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
                                             >
                                                 <div className="pt-1">
-                                                    {checkItem.critical ? <AlertCircle className="text-red-400" size={18} /> : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />}
+                                                    {isLocked
+                                                        ? <Lock size={16} className="text-amber-500" />
+                                                        : checkItem.critical
+                                                            ? <AlertCircle className="text-red-400" size={18} />
+                                                            : <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                                                    }
                                                 </div>
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
@@ -971,6 +1021,24 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                     </div>
                                                     <h3 className="text-gray-900 font-medium text-sm">{(checkItem.title_i18n_json as any)?.[locale] || checkItem.title_i18n_json?.es || checkItem.code}</h3>
                                                 </div>
+                                                {/* Botón candado */}
+                                                {hasDoc && canLockItem && (
+                                                    <button
+                                                        onClick={handleLockToggle}
+                                                        title={isLocked
+                                                            ? (canUnlockItem ? 'Desbloquear item' : 'Solo el administrador puede desbloquear')
+                                                            : 'Bloquear item (impide modificaciones del laboratorio)'}
+                                                        className={`p-1.5 rounded-lg transition-colors flex-shrink-0 mr-1 ${
+                                                            isLocked
+                                                                ? canUnlockItem
+                                                                    ? 'text-amber-600 bg-amber-100 hover:bg-amber-200'
+                                                                    : 'text-amber-400 bg-amber-50 cursor-not-allowed'
+                                                                : 'text-gray-300 hover:text-amber-500 hover:bg-amber-50'
+                                                        }`}
+                                                    >
+                                                        {isLocked ? <Lock size={15} /> : <LockOpen size={15} />}
+                                                    </button>
+                                                )}
                                                 <div className="text-gray-400">
                                                     <ChevronLeft size={20} className={`transform transition-transform ${isExpanded ? '-rotate-90' : 'rotate-180'}`} />
                                                 </div>
@@ -1015,77 +1083,114 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                         </div>
                                                     )}
 
-                                                    {/* Comentario del Laboratorio - Solo visible para usuarios del lab */}
-                                                    {['super_admin', 'lab_admin', 'lab_uploader', 'lab_viewer'].includes(userRole) && (
-                                                        <div className="mt-3 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <h4 className="text-xs font-bold uppercase text-yellow-700 tracking-wide flex items-center gap-2">
-                                                                    <span className="text-base">💬</span>
-                                                                    Comentario del Laboratorio
-                                                                </h4>
-                                                                {isUploader && labCommentItemId !== item.id && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setLabCommentItemId(item.id);
-                                                                            const existingComment = item.lab_comment_json?.[locale as keyof typeof item.lab_comment_json] || '';
-                                                                            setLabCommentText(existingComment);
-                                                                        }}
-                                                                        className="text-xs text-yellow-700 hover:text-yellow-900 underline"
-                                                                    >
-                                                                        {item.lab_comment_json ? 'Editar' : 'Agregar comentario'}
-                                                                    </button>
-                                                                )}
-                                                            </div>
-
-                                                            {labCommentItemId === item.id ? (
-                                                                <div className="space-y-2">
-                                                                    <textarea
-                                                                        value={labCommentText}
-                                                                        onChange={(e) => setLabCommentText(e.target.value)}
-                                                                        placeholder="Escriba un comentario o nota sobre esta etapa..."
-                                                                        className="w-full p-2 text-sm border border-yellow-300 rounded-md focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
-                                                                        rows={3}
-                                                                    />
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button
-                                                                            onClick={() => handleSaveLabComment(item.id)}
-                                                                            disabled={savingLabComment}
-                                                                            className="text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md disabled:opacity-50 flex items-center gap-1"
-                                                                        >
-                                                                            {savingLabComment ? (
-                                                                                <>
-                                                                                    <RefreshCw size={12} className="animate-spin" />
-                                                                                    Guardando...
-                                                                                </>
-                                                                            ) : (
-                                                                                'Guardar'
-                                                                            )}
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                setLabCommentItemId(null);
-                                                                                setLabCommentText('');
-                                                                            }}
-                                                                            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-                                                                        >
-                                                                            Cancelar
-                                                                        </button>
-                                                                        <span className="text-[10px] text-yellow-600 ml-auto">
-                                                                            Se traduce automáticamente a ES/EN/HI/ZH
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            ) : item.lab_comment_json ? (
-                                                                <p className="text-sm text-yellow-800 whitespace-pre-line">
-                                                                    {item.lab_comment_json[locale as keyof typeof item.lab_comment_json] || item.lab_comment_json.es || 'Sin comentario'}
-                                                                </p>
-                                                            ) : (
-                                                                <p className="text-xs text-yellow-600 italic">
-                                                                    No hay comentarios del laboratorio para esta etapa.
-                                                                </p>
+                                                    {/* Hilo de Comunicación (Chat) - Visible para todos */}
+                                                    <div className="mt-3 mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <h4 className="text-xs font-bold uppercase text-gray-700 tracking-wide flex items-center gap-2">
+                                                                <span className="text-base">💬</span>
+                                                                Hilo de Observaciones
+                                                            </h4>
+                                                            {labCommentItemId !== item.id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setLabCommentItemId(item.id);
+                                                                        setLabCommentText(''); // Siempre empieza vacío (nuevo mensaje)
+                                                                    }}
+                                                                    className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                                                >
+                                                                    {item.lab_comment_json ? 'Responder' : 'Añadir comentario'}
+                                                                </button>
                                                             )}
                                                         </div>
-                                                    )}
+
+                                                        {/* Renderizado de Mensajes Anteriores */}
+                                                        {(() => {
+                                                            const commentsArray = Array.isArray(item.lab_comment_json) 
+                                                                ? item.lab_comment_json 
+                                                                : (item.lab_comment_json && typeof item.lab_comment_json === 'object'
+                                                                    ? [{
+                                                                        id: 'legacy',
+                                                                        sender_name: 'Laboratorio',
+                                                                        sender_role: 'lab_admin',
+                                                                        timestamp: new Date().toISOString(),
+                                                                        content: item.lab_comment_json
+                                                                    }]
+                                                                    : []);
+                                                            
+                                                            if (commentsArray.length === 0 && labCommentItemId !== item.id) {
+                                                                return (
+                                                                    <p className="text-xs text-gray-400 italic">
+                                                                        No hay mensajes en este hilo.
+                                                                    </p>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <div className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-2">
+                                                                    {commentsArray.map((msg: any) => {
+                                                                        const isLab = ['lab_admin', 'lab_uploader', 'lab_viewer'].includes(msg.sender_role);
+                                                                        return (
+                                                                            <div key={msg.id} className={`p-2 rounded-lg text-sm border shadow-sm ${!isLab ? 'bg-blue-50 border-blue-100 ml-4' : 'bg-white border-gray-200 mr-4'}`}>
+                                                                                <div className="flex justify-between items-center mb-1">
+                                                                                    <span className={`font-semibold text-[11px] ${!isLab ? 'text-blue-800' : 'text-gray-700'}`}>
+                                                                                        {msg.sender_name} {!isLab ? '(Técnico/Revisor)' : '(Laboratorio)'}
+                                                                                    </span>
+                                                                                    {msg.id !== 'legacy' && (
+                                                                                        <span className="text-[10px] text-gray-400">{new Date(msg.timestamp).toLocaleString()}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className="text-gray-800 whitespace-pre-line text-xs">
+                                                                                    {msg.content[locale as keyof typeof msg.content] || msg.content.es || 'Sin texto'}
+                                                                                </p>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Caja para escribir nuevo mensaje */}
+                                                        {labCommentItemId === item.id && (
+                                                            <div className="space-y-2 mt-2 pt-2 border-t border-gray-200">
+                                                                <textarea
+                                                                    value={labCommentText}
+                                                                    onChange={(e) => setLabCommentText(e.target.value)}
+                                                                    placeholder="Escriba su mensaje aquí..."
+                                                                    className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-400 focus:border-blue-400 shadow-inner"
+                                                                    rows={3}
+                                                                />
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        onClick={() => handleSaveLabComment(item.id)}
+                                                                        disabled={savingLabComment || !labCommentText.trim()}
+                                                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md disabled:opacity-50 flex items-center gap-1 shadow-sm"
+                                                                    >
+                                                                        {savingLabComment ? (
+                                                                            <>
+                                                                                <RefreshCw size={12} className="animate-spin" />
+                                                                                Enviando...
+                                                                            </>
+                                                                        ) : (
+                                                                            'Enviar Mensaje'
+                                                                        )}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setLabCommentItemId(null);
+                                                                            setLabCommentText('');
+                                                                        }}
+                                                                        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                                                                    >
+                                                                        Cancelar
+                                                                    </button>
+                                                                    <span className="text-[10px] text-gray-400 ml-auto flex flex-col items-end">
+                                                                        <span>El mensaje es visible por el laboratorio y validadores.</span>
+                                                                        <span>Traducción a ES/EN/HI/ZH automática.</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
                                                     {!hasDoc ? (
                                                         // Caso: No hay documento

@@ -1,6 +1,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { 
   notifyDossierCreated, 
   notifyDocumentUploaded,
@@ -18,12 +19,23 @@ export async function POST(request: NextRequest) {
     const { type, data } = body;
 
     let result;
+    let resolvedUserName = data.userName || 'Usuario';
+
+    // Intentar resolver el nombre real del usuario autenticado para mayor seguridad
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('user_id', user.id).single();
+        if (profile?.full_name) {
+            resolvedUserName = profile.full_name;
+        }
+    }
 
     switch (type) {
       case 'dossier_created':
         result = await notifyDossierCreated(
           data.dossierName,
-          data.userName
+          resolvedUserName
         );
         break;
 
@@ -31,7 +43,8 @@ export async function POST(request: NextRequest) {
         result = await notifyDocumentUploaded(
           data.documentName,
           data.dossierName,
-          data.userName
+          resolvedUserName,
+          data.sectionName
         );
         break;
 
@@ -39,7 +52,7 @@ export async function POST(request: NextRequest) {
         result = await notifyAuditCompleted(
           data.dossierName,
           data.result,
-          data.userName
+          resolvedUserName
         );
         break;
 
@@ -50,14 +63,14 @@ export async function POST(request: NextRequest) {
       case 'product_created':
         result = await notifyProductCreated(
           data.productName,
-          data.userName
+          resolvedUserName
         );
         break;
 
       case 'product_updated':
         result = await notifyProductUpdated(
           data.productName,
-          data.userName
+          resolvedUserName
         );
         break;
 
@@ -65,7 +78,8 @@ export async function POST(request: NextRequest) {
         result = await notifyDocumentDeleted(
           data.documentName,
           data.dossierName,
-          data.userName
+          resolvedUserName,
+          data.sectionName
         );
         break;
 
@@ -73,7 +87,8 @@ export async function POST(request: NextRequest) {
         result = await notifyCommentAdded(
           data.dossierName,
           data.comment,
-          data.userName
+          resolvedUserName,
+          data.sectionName
         );
         break;
 

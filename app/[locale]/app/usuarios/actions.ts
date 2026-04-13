@@ -92,14 +92,15 @@ export async function createUser(formData: FormData) {
     }
 }
 
-export async function updateUserRole(userId: string, newRole: string, newLabId?: string) {
+export async function updateUserRole(userId: string, newRole: string, newLabId?: string, activityLogEnabled?: boolean) {
     try {
         // 1. SIEMPRE actualizar el rol en profiles (tabla principal de roles)
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
             .update({
                 role: newRole,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled })
             })
             .eq('user_id', userId);
 
@@ -110,7 +111,8 @@ export async function updateUserRole(userId: string, newRole: string, newLabId?:
                 .from('profiles')
                 .update({
                     role: newRole,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled })
                 })
                 .eq('id', userId);
 

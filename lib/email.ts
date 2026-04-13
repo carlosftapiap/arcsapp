@@ -102,15 +102,18 @@ export async function notifyDossierCreated(dossierName: string, userName: string
   });
 }
 
-export async function notifyDocumentUploaded(documentName: string, dossierName: string, userName: string) {
+export async function notifyDocumentUploaded(documentName: string, dossierName: string, userName: string, sectionName?: string) {
+  const details: Record<string, string> = {
+    'Dossier': dossierName,
+  };
+  if (sectionName) details['Sección'] = sectionName;
+
   return sendActivityNotification({
     type: 'document_uploaded',
     title: documentName,
     description: `Se ha subido un nuevo documento al dossier "${dossierName}".`,
     user: userName,
-    details: {
-      'Dossier': dossierName,
-    },
+    details,
   });
 }
 
@@ -153,26 +156,31 @@ export async function notifyProductUpdated(productName: string, userName: string
   });
 }
 
-export async function notifyDocumentDeleted(documentName: string, dossierName: string, userName: string) {
+export async function notifyDocumentDeleted(documentName: string, dossierName: string, userName: string, sectionName?: string) {
+  const details: Record<string, string> = {
+    'Dossier': dossierName,
+  };
+  if (sectionName) details['Sección'] = sectionName;
+
   return sendActivityNotification({
     type: 'document_deleted',
     title: documentName,
     description: `Se ha eliminado un documento del dossier "${dossierName}".`,
     user: userName,
-    details: {
-      'Dossier': dossierName,
-    },
+    details,
   });
 }
 
-export async function notifyCommentAdded(dossierName: string, comment: string, userName: string) {
+export async function notifyCommentAdded(dossierName: string, comment: string, userName: string, sectionName?: string) {
+  const details: Record<string, string> = {};
+  if (sectionName) details['Sección'] = sectionName;
+  details['Comentario'] = comment.length > 200 ? comment.substring(0, 200) + '...' : comment;
+
   return sendActivityNotification({
     type: 'comment_added',
     title: `Comentario en ${dossierName}`,
     description: 'Se ha agregado un nuevo comentario.',
     user: userName,
-    details: {
-      'Comentario': comment.length > 200 ? comment.substring(0, 200) + '...' : comment,
-    },
+    details,
   });
 }

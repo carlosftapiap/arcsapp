@@ -16,6 +16,7 @@ interface NotifyData {
   userEmail?: string;
   result?: string;
   comment?: string;
+  sectionName?: string;
 }
 
 export async function sendNotification(type: NotificationType, data: NotifyData) {
@@ -44,8 +45,8 @@ export async function notifyDossierCreated(dossierName: string, userName: string
   return sendNotification('dossier_created', { dossierName, userName });
 }
 
-export async function notifyDocumentUploaded(documentName: string, dossierName: string, userName: string) {
-  return sendNotification('document_uploaded', { documentName, dossierName, userName });
+export async function notifyDocumentUploaded(documentName: string, dossierName: string, userName: string, sectionName?: string) {
+  return sendNotification('document_uploaded', { documentName, dossierName, userName, sectionName });
 }
 
 export async function notifyAuditCompleted(dossierName: string, result: string, userName: string) {
@@ -64,10 +65,10 @@ export async function notifyProductUpdated(productName: string, userName: string
   return sendNotification('product_updated', { productName, userName });
 }
 
-export async function notifyDocumentDeleted(documentName: string, dossierName: string, userName: string) {
-  return sendNotification('document_deleted', { documentName, dossierName, userName });
+export async function notifyDocumentDeleted(documentName: string, dossierName: string, userName: string, sectionName?: string) {
+  return sendNotification('document_deleted', { documentName, dossierName, userName, sectionName });
 }
 
-export async function notifyCommentAdded(dossierName: string, comment: string, userName: string) {
-  return sendNotification('comment_added', { dossierName, comment, userName });
+export async function notifyCommentAdded(dossierName: string, comment: string, userName: string, sectionName?: string) {
+  return sendNotification('comment_added', { dossierName, comment, userName, sectionName });
 }

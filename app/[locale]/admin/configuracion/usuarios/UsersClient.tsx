@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Users as UsersIcon, Lock, User, Mail, Building2, UserCog, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Users as UsersIcon, Lock, User, Mail, Building2, UserCog, UserPlus, Edit, Trash2, Activity } from 'lucide-react';
 import { createUser, updateUserRole, deleteUser } from '@/app/[locale]/app/usuarios/actions';
 
 interface Lab {
@@ -17,6 +17,7 @@ interface Profile {
     locale: string;
     created_at: string;
     role?: string;
+    activity_log_enabled?: boolean;
     lab_members: Array<{
         lab_id: string;
         role: string;
@@ -41,6 +42,7 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
     const [editingUser, setEditingUser] = useState<Profile | null>(null);
     const [editRole, setEditRole] = useState('');
     const [editLabId, setEditLabId] = useState('');
+    const [editActivityLog, setEditActivityLog] = useState(true);
     const [saving, setSaving] = useState(false);
 
     // Form States
@@ -72,9 +74,9 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
     // Open edit modal
     const handleEditClick = (profile: Profile) => {
         setEditingUser(profile);
-        // Priorizar profiles.role sobre lab_members.role
         setEditRole(profile.role || profile.lab_members?.[0]?.role || 'lab_viewer');
         setEditLabId(profile.lab_members?.[0]?.lab_id || '');
+        setEditActivityLog(profile.activity_log_enabled !== false); // default true
         setShowEditForm(true);
     };
 
@@ -84,7 +86,7 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
         setSaving(true);
 
         try {
-            const result = await updateUserRole(editingUser.user_id, editRole, editLabId || undefined);
+            const result = await updateUserRole(editingUser.user_id, editRole, editLabId || undefined, editActivityLog);
             if (result.error) {
                 alert("Error al actualizar: " + result.error);
             } else {
@@ -458,6 +460,30 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                     {editRole === 'reviewer' && "Puede revisar y aprobar documentos de múltiples laboratorios asignados."}
                                     {editRole === 'super_admin' && "Tiene control total sobre toda la plataforma."}
                                 </p>
+                            </div>
+
+                            {/* Activity Log Permission */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-800 mb-2">Permisos Adicionales</label>
+                                <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editActivityLog ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${editActivityLog ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
+                                            <Activity size={20} />
+                                        </div>
+                                        <div>
+                                            <span className={`block text-sm font-medium ${editActivityLog ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                                Log de Actividades
+                                            </span>
+                                            <span className="block text-xs text-gray-500">
+                                                Registrar las acciones de este usuario en la auditoría del sistema.
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${editActivityLog ? 'bg-indigo-600' : 'bg-gray-200'}`}>
+                                        <input type="checkbox" className="sr-only" checked={editActivityLog} onChange={(e) => setEditActivityLog(e.target.checked)} />
+                                        <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editActivityLog ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="flex gap-3 pt-4 border-t border-gray-100">

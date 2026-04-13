@@ -34,7 +34,16 @@ export default function LoginPage() {
             }
 
             if (data.user) {
-                // Redirigir según el rol
+                // Registrar login en activity_log (fire & forget)
+                fetch('/api/auth/log-activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: 'user_login',
+                        payload: { email: data.user.email }
+                    })
+                }).catch(() => {});
+
                 router.push('./app');
                 router.refresh();
             }
@@ -45,14 +54,20 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 relative">
-            {/* Language Switcher - Top Right */}
-            <div className="absolute top-4 right-4 z-10">
-                <LanguageSwitcher />
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100 relative">
+            {/* Franja Superior Branding */}
+            <div className="w-full bg-[#203f90] text-white py-6 text-center shadow-md relative">
+                <h1 className="text-3xl font-bold tracking-wider">ARCSAPP</h1>
+                <p className="mt-1 text-sm font-medium text-blue-100">Sistema de Gestión Documental</p>
+                {/* Language Switcher - Top Right */}
+                <div className="absolute top-1/2 -translate-y-1/2 right-4 z-10">
+                    <LanguageSwitcher />
+                </div>
             </div>
 
-            <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl">
-                {/* Logo y título */}
+            <div className="flex-1 flex items-center justify-center p-4">
+                <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-2xl">
+                    {/* Logo y título */}
                 <div className="text-center">
                     <div className="mx-auto flex items-center justify-center mb-4">
                         <img
@@ -135,6 +150,7 @@ export default function LoginPage() {
                         </p>
                     </div>
                 </form>
+            </div>
             </div>
         </div>
     );

@@ -115,6 +115,14 @@ export default function Sidebar({ userRole, labName }: SidebarProps) {
             roles: ['super_admin']
         },
 
+        // Log de Actividad Global - Solo super_admin
+        {
+            name: 'Log de Actividad',
+            href: `/${locale}/admin/actividad`,
+            icon: Activity,
+            roles: ['super_admin']
+        },
+
         // Otros Documentos - Solo Lab Admin
         {
             name: t('nav.extraDocs'),

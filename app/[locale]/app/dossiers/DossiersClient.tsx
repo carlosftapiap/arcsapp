@@ -523,7 +523,7 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                 <div className="lg:col-span-1 space-y-6">
                     {/* Solo mostrar si es admin/revisor o si el usuario quiere verlo */}
                     {isReviewerOrAdmin && (
-                        <RecentActivityFeed labId={currentLabId} />
+                        <RecentActivityFeed labId={currentLabId} userRole={userRole} />
                     )}
 
                     {/* Otros widgets futuros podrían ir aquí */}

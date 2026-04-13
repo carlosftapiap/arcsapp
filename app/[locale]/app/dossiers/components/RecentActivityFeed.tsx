@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Clock, FileText, CheckCircle, AlertCircle, MessageSquare, Plus, Activity, Trash2, RefreshCw } from 'lucide-react';
+import { Clock, FileText, CheckCircle, AlertCircle, MessageSquare, Plus, Activity, Trash2, RefreshCw, LogIn, LogOut } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
@@ -10,35 +10,27 @@ import Link from 'next/link';
 
 interface ActivityItem {
     source_id: string;
-    type: 'dossier_created' | 'dossier_status' | 'document_uploaded' | 'document_deleted' | 'review_added' | 'lab_comment';
+    type: string;
     desc_text: string;
-    e_id: string; // Dossier ID
-    e_name: string; // Product Name
+    e_id: string;
+    e_name: string;
     u_id: string;
     user_name: string;
     time_at: string;
-    meta: {
-        stage_code?: string;
-        stage_title?: { es: string; en: string };
-        file_path?: string;
-        status?: string;
-        decision?: 'approved' | 'observed' | 'rejected';
-        version_reviewed?: number;
-        product_type?: string;
-    } | any;
+    meta: any;
+    is_session_event?: boolean;
 }
 
-export default function RecentActivityFeed({ labId }: { labId?: string }) {
+export default function RecentActivityFeed({ labId, userRole }: { labId?: string; userRole?: string }) {
     const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [loading, setLoading] = useState(true);
     const t = useTranslations();
     const locale = useLocale();
 
-    // Map locale string to date-fns locale object
     const dateLocale = locale === 'es' ? es : enUS;
+    const isAdmin = userRole === 'super_admin';
 
     useEffect(() => {
-        // Now using RPC that handles permissions/filtering
         fetchActivity();
     }, [labId]);
 
@@ -47,17 +39,44 @@ export default function RecentActivityFeed({ labId }: { labId?: string }) {
         const supabase = createClient();
 
         try {
+            // Fetch actividad de documentos/dossiers
             const { data, error } = await supabase.rpc('get_recent_activity', {
                 p_limit: 50,
                 p_offset: 0,
                 p_lab_id: labId || null
             });
 
-            if (error) {
-                console.error('Error fetching activity:', error.message || error);
-            } else {
-                setActivities(data || []);
+            if (error) console.error('Error fetching activity:', error.message || error);
+
+            let allActivities: ActivityItem[] = data || [];
+
+            // Para admin: también fetch eventos de login/logout
+            if (isAdmin) {
+                try {
+                    const res = await fetch('/api/system-activity?limit=20');
+                    const json = await res.json();
+                    const sessionEvents: ActivityItem[] = (json.entries || []).map((e: any) => ({
+                        source_id: e.id,
+                        type: e.event_type,
+                        desc_text: e.event_type === 'user_login' ? 'Inició sesión' : 'Cerró sesión',
+                        e_id: '',
+                        e_name: '',
+                        u_id: e.actor_user_id || '',
+                        user_name: e.payload_json?.user_name || 'Usuario',
+                        time_at: e.created_at,
+                        meta: { ip_address: e.payload_json?.ip_address, user_email: e.payload_json?.user_email },
+                        is_session_event: true,
+                    }));
+                    allActivities = [...allActivities, ...sessionEvents];
+                    // Ordenar por fecha desc
+                    allActivities.sort((a, b) => new Date(b.time_at).getTime() - new Date(a.time_at).getTime());
+                    allActivities = allActivities.slice(0, 60);
+                } catch (err) {
+                    console.error('Error fetching session events:', err);
+                }
             }
+
+            setActivities(allActivities);
         } catch (err: any) {
             console.error('Unexpected error fetching activity:', err.message || err);
         } finally {
@@ -76,6 +95,8 @@ export default function RecentActivityFeed({ labId }: { labId?: string }) {
                     ? <CheckCircle size={16} className="text-green-600" />
                     : <AlertCircle size={16} className="text-amber-600" />;
             case 'lab_comment': return <MessageSquare size={16} className="text-pink-600" />;
+            case 'user_login': return <LogIn size={16} className="text-teal-600" />;
+            case 'user_logout': return <LogOut size={16} className="text-orange-500" />;
             default: return <Clock size={16} className="text-gray-500" />;
         }
     };
@@ -128,21 +149,30 @@ export default function RecentActivityFeed({ labId }: { labId?: string }) {
             </div>
             <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto custom-scrollbar">
                 {activities.map((item, idx) => (
-                    <div key={`${item.source_id}-${idx}`} className="p-4 hover:bg-gray-50 transition-colors group">
+                    <div key={`${item.source_id}-${idx}`} className={`p-4 hover:bg-gray-50 transition-colors group ${item.is_session_event ? 'bg-gray-50/30' : ''}`}>
                         <div className="flex gap-3">
-                            <div className={`mt-1 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm ${item.type === 'document_deleted' ? 'bg-red-50 border-red-100' :
+                            <div className={`mt-1 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm ${
+                                item.type === 'document_deleted' ? 'bg-red-50 border-red-100' :
                                 item.type === 'review_added' && item.meta?.decision === 'approved' ? 'bg-green-50 border-green-100' :
-                                    item.type === 'review_added' && item.meta?.decision !== 'approved' ? 'bg-amber-50 border-amber-100' :
-                                        'bg-gray-50 border-gray-200'
-                                }`}>
+                                item.type === 'review_added' && item.meta?.decision !== 'approved' ? 'bg-amber-50 border-amber-100' :
+                                item.type === 'user_login' ? 'bg-teal-50 border-teal-100' :
+                                item.type === 'user_logout' ? 'bg-orange-50 border-orange-100' :
+                                'bg-gray-50 border-gray-200'
+                            }`}>
                                 {getActivityIcon(item.type, item.meta)}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start">
                                     <p className="text-sm font-medium text-gray-900 truncate pr-2">
-                                        <Link href={`/${locale}/app/dossiers/${item.e_id}`} className="hover:text-blue-600 hover:underline transition-all">
-                                            {item.e_name}
-                                        </Link>
+                                        {item.is_session_event ? (
+                                            <span className={`font-semibold ${item.type === 'user_login' ? 'text-teal-700' : 'text-orange-600'}`}>
+                                                {item.user_name}
+                                            </span>
+                                        ) : (
+                                            <Link href={`/${locale}/app/dossiers/${item.e_id}`} className="hover:text-blue-600 hover:underline transition-all">
+                                                {item.e_name}
+                                            </Link>
+                                        )}
                                     </p>
                                     <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">
                                         {item.time_at ? formatDistanceToNow(new Date(item.time_at), { addSuffix: true, locale: dateLocale }) : ''}
@@ -150,14 +180,29 @@ export default function RecentActivityFeed({ labId }: { labId?: string }) {
                                 </div>
 
                                 <div className="text-xs text-gray-600 mt-1">
-                                    <div className="flex items-center flex-wrap gap-y-1">
-                                        <span className={item.type === 'document_deleted' ? 'line-through text-gray-400' : ''}>
-                                            {item.desc_text}
-                                        </span>
-                                        {getStageLabel(item.meta)}
-                                    </div>
-
-                                    {item.user_name && <p className="text-gray-400 mt-0.5 text-[11px]">• por {item.user_name}</p>}
+                                    {item.is_session_event ? (
+                                        <div>
+                                            <span className={`font-medium ${item.type === 'user_login' ? 'text-teal-600' : 'text-orange-500'}`}>
+                                                {item.type === 'user_login' ? 'Inició sesión' : 'Cerró sesión'}
+                                            </span>
+                                            {item.meta?.user_email && (
+                                                <p className="text-gray-400 text-[11px] mt-0.5">• {item.meta.user_email}</p>
+                                            )}
+                                            {item.meta?.ip_address && item.meta.ip_address !== 'unknown' && (
+                                                <p className="text-gray-400 text-[11px] font-mono">IP: {item.meta.ip_address}</p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex items-center flex-wrap gap-y-1">
+                                                <span className={item.type === 'document_deleted' ? 'line-through text-gray-400' : ''}>
+                                                    {item.desc_text}
+                                                </span>
+                                                {getStageLabel(item.meta)}
+                                            </div>
+                                            {item.user_name && <p className="text-gray-400 mt-0.5 text-[11px]">• por {item.user_name}</p>}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
