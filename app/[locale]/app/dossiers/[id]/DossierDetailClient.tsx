@@ -14,6 +14,8 @@ import { runAIAnalysisForItem } from '@/app/[locale]/app/dossiers/actions/ai-ana
 import { saveReviewWithTranslation } from '@/app/[locale]/app/dossiers/actions/translate';
 import { saveLabComment } from '@/app/[locale]/app/dossiers/actions/lab-comment';
 import { notifyDocumentUploaded, notifyDocumentDeleted, notifyCommentAdded } from '@/lib/notify-client';
+import DossierAssignments from './components/DossierAssignments';
+import DocumentVersionTimeline from './components/DocumentVersionTimeline';
 
 // Interfaces Actualizadas
 interface AIAnalysis {
@@ -93,6 +95,7 @@ interface Props {
     dossier: Dossier;
     initialItems: DossierItem[];
     userRole: string;
+    userId?: string;
     previousAudit?: PreviousAudit | null;
 }
 
@@ -253,7 +256,7 @@ function getOptionalTranslation(t: any, key: string): string | null {
 }
 
 
-export default function DossierDetailClient({ dossier, initialItems, userRole, previousAudit }: Props) {
+export default function DossierDetailClient({ dossier, initialItems, userRole, userId, previousAudit }: Props) {
     console.log("Rendering DossierDetailClient Clean Reconstruction");
     const t = useTranslations();
     const locale = useLocale();
@@ -558,22 +561,14 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
     // ...
 
     const handleDeleteDocument = async (docId: string, filePath: string, dossierItemId: string) => {
-        if (!confirm('¿Está seguro de eliminar este documento? Esta acción no se puede deshacer.')) return;
+        if (!confirm('¿Está seguro de eliminar este documento? El archivo quedará marcado como inactivo y el superadministrador podrá ver el historial.')) return;
 
         setDeletingDocId(docId);
         const supabase = createClient();
 
         try {
-            // 1. Eliminar archivo del storage
-            const { error: storageError } = await supabase.storage
-                .from('dossier-documents')
-                .remove([filePath]);
-
-            if (storageError) {
-                console.warn('Error eliminando archivo del storage:', storageError);
-            }
-
-            // 2. "Eliminar" registro de la base de datos (Soft Delete)
+            // Soft Delete en base de datos — NO se elimina el archivo del storage
+            // para preservar el historial de versiones
             const { data: { user } } = await supabase.auth.getUser();
             const { error: dbError } = await supabase
                 .from('documents')
@@ -586,28 +581,31 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
 
             if (dbError) throw dbError;
 
-            // 3. Actualizar estado del dossier_item a 'pending' si no quedan documentos
+            // Actualizar estado del dossier_item a 'pending' si no quedan documentos activos
             const currentItem = items.find(i => i.id === dossierItemId);
-            const remainingDocs = (currentItem?.documents || []).filter(d => d.id !== docId);
+            const remainingActiveDocs = (currentItem?.documents || []).filter(d => d.id !== docId && d.status !== 'deleted');
 
-            if (remainingDocs.length === 0) {
+            if (remainingActiveDocs.length === 0) {
                 await supabase.from('dossier_items').update({ status: 'pending' }).eq('id', dossierItemId);
             }
 
-            // 4. Actualizar UI
+            // Actualizar UI: marcar como eliminado en lugar de filtrar
             setItems(prev => prev.map(i => {
                 if (i.id === dossierItemId) {
-                    const newDocs = i.documents.filter(d => d.id !== docId);
+                    const updatedDocs = i.documents.map(d =>
+                        d.id === docId ? { ...d, status: 'deleted' } : d
+                    );
+                    const activeDocsCount = updatedDocs.filter(d => d.status !== 'deleted').length;
                     return {
                         ...i,
-                        status: newDocs.length === 0 ? 'pending' : i.status,
-                        documents: newDocs
+                        status: activeDocsCount === 0 ? 'pending' : i.status,
+                        documents: updatedDocs
                     };
                 }
                 return i;
             }));
 
-            alert('Documento eliminado correctamente.');
+            alert('Documento marcado como eliminado.');
             
             // Enviar notificación por email
             const fileName = filePath.split('/').pop() || 'Documento';
@@ -744,6 +742,15 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                     </p>
                 </div>
             </div>
+
+            {/* Asignaciones de técnicos - Solo visible para superadmin */}
+            {isSuperAdmin && userId && (
+                <DossierAssignments
+                    dossierId={dossier.id}
+                    labId={dossier.lab_id}
+                    currentUserId={userId}
+                />
+            )}
 
             {/* Auditoría - Visible para todos los roles */}
             {previousAudit && (
@@ -925,8 +932,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                     // Safety fallback
                                     const checkItem = item.checklist_item || { code: 'N/A', title_i18n_json: { es: 'Requisito desconocido' }, critical: false };
 
-                                    const currentDoc = item.documents?.[0]; // El más reciente
-                                    const hasDoc = !!currentDoc;
+                                    const currentDoc = item.documents?.find((d: any) => d.status !== 'deleted') || item.documents?.[0]; // Primer doc activo
+                                    const hasDoc = !!currentDoc && currentDoc.status !== 'deleted';
                                     const isExpanded = expandedItemId === item.id;
 
                                     // Badges Row Summary
@@ -1131,35 +1138,46 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                 </div>
 
                                                                 {/* Lista de documentos */}
-                                                                <div className={`space-y-3 ${checkItem.allows_multiple_files && item.documents?.length > 2 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}>
-                                                                    {(checkItem.allows_multiple_files ? item.documents : [currentDoc]).map((doc, docIndex) => (
-                                                                        <div key={doc.id} className={`flex items-start gap-3 ${docIndex > 0 ? 'pt-3 border-t border-gray-100' : ''}`}>
-                                                                            <div className="p-2 bg-red-50 rounded text-red-600 flex-shrink-0">
+                                                                <div className={`space-y-3 ${item.documents?.length > 2 ? 'max-h-64 overflow-y-auto pr-2' : ''}`}>
+                                                                    {item.documents.map((doc: any, docIndex: number) => {
+                                                                        const isDeleted = doc.status === 'deleted';
+                                                                        return (
+                                                                        <div key={doc.id} className={`flex items-start gap-3 ${docIndex > 0 ? 'pt-3 border-t border-gray-100' : ''} ${isDeleted ? 'opacity-60' : ''}`}>
+                                                                            <div className={`p-2 rounded flex-shrink-0 ${isDeleted ? 'bg-gray-100 text-gray-400' : 'bg-red-50 text-red-600'}`}>
                                                                                 <FileText size={20} />
                                                                             </div>
                                                                             <div className="flex-1 min-w-0">
-                                                                                <p className="text-sm font-medium text-gray-900 truncate" title={doc.file_path}>
-                                                                                    {doc.file_path.split('/').pop()}
-                                                                                </p>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <p className={`text-sm font-medium truncate ${isDeleted ? 'line-through text-gray-400' : 'text-gray-900'}`} title={doc.file_path}>
+                                                                                        {doc.file_path.split('/').pop()}
+                                                                                    </p>
+                                                                                    {isDeleted && <span className="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded shrink-0">Eliminado</span>}
+                                                                                </div>
                                                                                 <p className="text-xs text-gray-500">
                                                                                     {checkItem.allows_multiple_files ? `Archivo ${docIndex + 1}` : `Versión ${doc.version}`} • {new Date(doc.uploaded_at).toLocaleDateString()} • {doc.profiles?.full_name || 'Usuario'}
                                                                                 </p>
                                                                                 <div className="flex flex-wrap gap-2 mt-2">
-                                                                                    <button
-                                                                                        onClick={() => handlePreview(doc.file_path)}
-                                                                                        className="text-xs btn-secondary py-1 px-2 flex items-center gap-1 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                                                                        title="Vista previa"
-                                                                                    >
-                                                                                        <Eye size={12} />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => handleDownload(doc.file_path, doc.file_path.split('/').pop() || 'download')}
-                                                                                        className="text-xs btn-secondary py-1 px-2 flex items-center gap-1"
-                                                                                    >
-                                                                                        <Download size={12} />
-                                                                                    </button>
-                                                                                    {/* Reemplazar solo para items de archivo único */}
-                                                                                    {!checkItem.allows_multiple_files && isUploader && item.status !== 'approved' && (
+                                                                                    {!isDeleted && (
+                                                                                        <button
+                                                                                            onClick={() => handlePreview(doc.file_path)}
+                                                                                            className="text-xs btn-secondary py-1 px-2 flex items-center gap-1 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                                                                            title="Vista previa"
+                                                                                        >
+                                                                                            <Eye size={12} />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Descarga: activos siempre, eliminados solo para superadmin */}
+                                                                                    {(!isDeleted || isSuperAdmin) && (
+                                                                                        <button
+                                                                                            onClick={() => handleDownload(doc.file_path, doc.file_path.split('/').pop() || 'download')}
+                                                                                            className="text-xs btn-secondary py-1 px-2 flex items-center gap-1"
+                                                                                            title={isDeleted ? 'Descargar versión eliminada' : 'Descargar'}
+                                                                                        >
+                                                                                            <Download size={12} />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {/* Reemplazar solo para items de archivo único activos */}
+                                                                                    {!isDeleted && !checkItem.allows_multiple_files && isUploader && item.status !== 'approved' && (
                                                                                         <>
                                                                                             <input type="file" id={`reupload-${item.id}`} className="hidden" accept=".pdf,.doc,.docx,.zip" onChange={(e) => handleFileUpload(e, item.id)} disabled={uploadingItemId === item.id} />
                                                                                             <label htmlFor={`reupload-${item.id}`} className="text-xs btn-secondary py-1 px-2 flex items-center gap-1 cursor-pointer text-blue-600 hover:bg-blue-50">
@@ -1167,8 +1185,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                                             </label>
                                                                                         </>
                                                                                     )}
-                                                                                    {/* Eliminar - para super_admin en cualquier caso, o para multi-archivo */}
-                                                                                    {(isSuperAdmin || (checkItem.allows_multiple_files && isUploader)) && item.status !== 'approved' && (
+                                                                                    {/* Eliminar - solo docs activos */}
+                                                                                    {!isDeleted && (isSuperAdmin || (checkItem.allows_multiple_files && isUploader)) && item.status !== 'approved' && (
                                                                                         <button
                                                                                             onClick={() => handleDeleteDocument(doc.id, doc.file_path, item.id)}
                                                                                             disabled={deletingDocId === doc.id}
@@ -1178,8 +1196,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                                             <Trash2 size={12} />
                                                                                         </button>
                                                                                     )}
-                                                                                    {/* Botón Analizar IA por archivo */}
-                                                                                    {isSuperAdmin && (
+                                                                                    {/* Botón Analizar IA por archivo - solo activos */}
+                                                                                    {!isDeleted && isSuperAdmin && (
                                                                                         <button
                                                                                             onClick={() => handleRunAI(doc.id)}
                                                                                             disabled={analyzingDocId === doc.id}
@@ -1213,8 +1231,17 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, p
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                    ))}
+                                                                    );
+                                                                    })}
                                                                 </div>
+
+                                                                {/* Historial completo de versiones - Solo superadmin */}
+                                                                {isSuperAdmin && item.documents?.length > 0 && (
+                                                                    <DocumentVersionTimeline
+                                                                        itemCode={checkItem.code}
+                                                                        documents={item.documents}
+                                                                    />
+                                                                )}
                                                             </div>
 
                                                             {/* Bloque B: Estado del Requisito - Dinámico según estado */}

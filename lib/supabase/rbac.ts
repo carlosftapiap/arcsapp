@@ -3,7 +3,8 @@ export type UserRole =
     | 'lab_admin'
     | 'lab_uploader'
     | 'lab_viewer'
-    | 'reviewer';
+    | 'reviewer'
+    | 'tecnico';
 
 export type ProductType = 'medicine_general' | 'biologic' | 'device_medical';
 
@@ -28,7 +29,7 @@ export function canUploadDocuments(role: UserRole): boolean {
  * Verificar si un rol puede revisar documentos
  */
 export function canReviewDocuments(role: UserRole): boolean {
-    return ['super_admin', 'reviewer'].includes(role);
+    return ['super_admin', 'reviewer', 'tecnico'].includes(role);
 }
 
 /**
@@ -69,6 +70,7 @@ export function getRoleName(role: UserRole): string {
         lab_uploader: 'Cargador de Documentos',
         lab_viewer: 'Visor',
         reviewer: 'Revisor Externo',
+        tecnico: 'Técnico Regulatorio',
     };
     return roleNames[role];
 }

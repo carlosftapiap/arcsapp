@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
-import { FolderOpen, Plus, Calendar, ArrowRight, Package, Building2, ClipboardList, AlertCircle, Trash2 } from 'lucide-react';
+import { FolderOpen, Plus, Calendar, ArrowRight, Package, Building2, ClipboardList, AlertCircle, Trash2, UserPlus, X } from 'lucide-react';
+import DossierAssignments from './[id]/components/DossierAssignments';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RecentActivityFeed from './components/RecentActivityFeed';
@@ -23,6 +24,7 @@ interface Dossier {
     product_type: string;
     created_at: string;
     product_id?: string;
+    assignedTechnicians?: { user_id: string; full_name: string }[];
 }
 
 interface Lab {
@@ -39,14 +41,15 @@ interface LabDashboard {
 
 interface Props {
     initialDossiers: Dossier[];
-    initialProducts: Product[]; // Renombrado para coincidir con page.tsx
+    initialProducts: Product[];
     availableLabs: Lab[];
     initialLabId: string;
     userRole?: string;
+    userId?: string;
     labsDashboard?: LabDashboard[];
 }
 
-export default function DossiersClient({ initialDossiers, initialProducts, availableLabs, initialLabId, userRole = 'viewer', labsDashboard = [] }: Props) {
+export default function DossiersClient({ initialDossiers, initialProducts, availableLabs, initialLabId, userRole = 'viewer', userId, labsDashboard = [] }: Props) {
     const t = useTranslations();
     const router = useRouter();
     const locale = useLocale();
@@ -92,16 +95,67 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
         console.log("🔄 Recargando datos para Lab ID:", labId);
 
         try {
-            // 1. Cargar Dossiers
-            const { data: newDossiers, error: dossiersError } = await supabase
-                .from('dossiers')
-                .select('*')
-                .eq('lab_id', labId)
-                .order('created_at', { ascending: false });
+            // 1. Cargar Dossiers (filtrados por asignación para reviewers)
+            let newDossiers: Dossier[] = [];
 
-            if (dossiersError) throw dossiersError;
+            if ((userRole === 'reviewer' || userRole === 'tecnico') && userId) {
+                // Obtener IDs de dossiers asignados a este técnico en este lab
+                const { data: assignments } = await supabase
+                    .from('dossier_technician_assignments')
+                    .select('dossier_id')
+                    .eq('user_id', userId)
+                    .eq('active', true);
 
-            // 2. Cargar Productos
+                const assignedIds = assignments?.map((a: any) => a.dossier_id) || [];
+
+                if (assignedIds.length > 0) {
+                    const { data, error: dossiersError } = await supabase
+                        .from('dossiers')
+                        .select('*')
+                        .eq('lab_id', labId)
+                        .in('id', assignedIds)
+                        .order('created_at', { ascending: false });
+                    if (dossiersError) throw dossiersError;
+                    newDossiers = data || [];
+                }
+            } else {
+                const { data, error: dossiersError } = await supabase
+                    .from('dossiers')
+                    .select('*')
+                    .eq('lab_id', labId)
+                    .order('created_at', { ascending: false });
+                if (dossiersError) throw dossiersError;
+                newDossiers = data || [];
+            }
+
+            // 2. Cargar técnicos asignados a cada dossier (solo para superadmin)
+            if (isSuperAdmin && newDossiers.length > 0) {
+                const dossierIds = newDossiers.map(d => d.id);
+                const { data: techAssignments } = await supabase
+                    .from('dossier_technician_assignments')
+                    .select('dossier_id, user_id')
+                    .in('dossier_id', dossierIds)
+                    .eq('active', true);
+
+                if (techAssignments && techAssignments.length > 0) {
+                    const assignedUserIds = [...new Set(techAssignments.map((a: any) => a.user_id))];
+                    const { data: techProfiles } = await supabase
+                        .from('profiles')
+                        .select('user_id, full_name')
+                        .in('user_id', assignedUserIds);
+
+                    const profileMap = new Map((techProfiles || []).map((p: any) => [p.user_id, p.full_name]));
+
+                    newDossiers = newDossiers.map(d => ({
+                        ...d,
+                        assignedTechnicians: (techAssignments as any[])
+                            .filter(a => a.dossier_id === d.id)
+                            .map(a => ({ user_id: a.user_id, full_name: profileMap.get(a.user_id) || '' }))
+                    }));
+                }
+            }
+
+            // 3. Cargar Productos
             const { data: newProducts, error: productsError } = await supabase
                 .from('products')
                 .select('id, nombre_comercial, product_type, principio_activo')
@@ -249,7 +303,11 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
     };
 
     const canDelete = userRole === 'super_admin';
+    const isSuperAdmin = userRole === 'super_admin';
     const isReviewerOrAdmin = userRole === 'reviewer' || userRole === 'super_admin' || userRole === 'lab_admin';
+
+    // Modal de asignaciones
+    const [assigningDossier, setAssigningDossier] = useState<{ id: string; name: string; labId: string } | null>(null);
 
     return (
         <div className="space-y-6">
@@ -280,8 +338,8 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                         </select>
                     </div>
 
-                    {/* Solo mostrar botón crear si NO es reviewer puro */}
-                    {userRole !== 'reviewer' && (
+                    {/* Solo mostrar botón crear si es usuario de lab (no reviewer ni técnico) */}
+                    {userRole !== 'reviewer' && userRole !== 'tecnico' && (
                         <button
                             onClick={() => setShowCreateModal(true)}
                             className="btn-primary flex items-center space-x-2 whitespace-nowrap"
@@ -378,6 +436,15 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                                             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getStatusColor(dossier.status)} uppercase tracking-wide`}>
                                                 {getStatusLabel(dossier.status)}
                                             </span>
+                                            {isSuperAdmin && (
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); setAssigningDossier({ id: dossier.id, name: dossier.product_name, labId: currentLabId }); }}
+                                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                    title="Gestionar técnicos asignados"
+                                                >
+                                                    <UserPlus size={16} />
+                                                </button>
+                                            )}
                                             {canDelete && (
                                                 <button
                                                     onClick={(e) => handleDeleteDossier(e, dossier.id, dossier.product_name)}
@@ -399,6 +466,24 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                                             {t(`productTypes.${dossier.product_type}`) || dossier.product_type}
                                         </p>
 
+                                        {/* Técnicos asignados - solo visible para superadmin */}
+                                        {isSuperAdmin && (
+                                            <div className="mb-3 min-h-[20px]">
+                                                {dossier.assignedTechnicians && dossier.assignedTechnicians.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {dossier.assignedTechnicians.map(t => (
+                                                            <span key={t.user_id} className="inline-flex items-center gap-1 text-[11px] bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
+                                                                {t.full_name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[11px] text-gray-300 italic">Sin técnico asignado</span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
                                             <div className="flex items-center">
                                                 <Calendar size={12} className="mr-1" />
@@ -413,16 +498,18 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                             </Link>
                         ))}
 
-                        {/* Empty State Action Card */}
-                        <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-600 gap-3 min-h-[180px]"
-                        >
-                            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
-                                <Plus size={24} />
-                            </div>
-                            <span className="font-medium">Crear nuevo Dossier</span>
-                        </button>
+                        {/* Empty State Action Card - solo para usuarios que pueden crear */}
+                        {userRole !== 'reviewer' && userRole !== 'tecnico' && (
+                            <button
+                                onClick={() => setShowCreateModal(true)}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-gray-400 hover:text-blue-600 gap-3 min-h-[180px]"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
+                                    <Plus size={24} />
+                                </div>
+                                <span className="font-medium">Crear nuevo Dossier</span>
+                            </button>
+                        )}
                     </div>
 
                     {dossiers.length === 0 && !refreshing && (
@@ -442,6 +529,35 @@ export default function DossiersClient({ initialDossiers, initialProducts, avail
                     {/* Otros widgets futuros podrían ir aquí */}
                 </div>
             </div>
+
+            {/* Modal Asignar Técnicos */}
+            {assigningDossier && userId && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <UserPlus size={20} className="text-indigo-600" />
+                                    Técnicos asignados
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-0.5 truncate">{assigningDossier.name}</p>
+                            </div>
+                            <button
+                                onClick={() => setAssigningDossier(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <DossierAssignments
+                            dossierId={assigningDossier.id}
+                            labId={assigningDossier.labId}
+                            currentUserId={userId}
+                            onAssignmentChange={() => loadLabData(currentLabId)}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Modal Crear Dossier */}
             {showCreateModal && (

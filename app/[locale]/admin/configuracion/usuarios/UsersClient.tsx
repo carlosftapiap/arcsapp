@@ -16,6 +16,7 @@ interface Profile {
     email: string;
     locale: string;
     created_at: string;
+    role?: string;
     lab_members: Array<{
         lab_id: string;
         role: string;
@@ -59,6 +60,9 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
         } else if (type === 'external_reviewer') {
             setCreateRole('reviewer');
             setSelectedLabId('');
+        } else if (type === 'tecnico') {
+            setCreateRole('tecnico');
+            setSelectedLabId('');
         } else if (type === 'global_admin') {
             setCreateRole('super_admin');
             setSelectedLabId('');
@@ -68,7 +72,8 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
     // Open edit modal
     const handleEditClick = (profile: Profile) => {
         setEditingUser(profile);
-        setEditRole(profile.lab_members?.[0]?.role || 'lab_viewer');
+        // Priorizar profiles.role sobre lab_members.role
+        setEditRole(profile.role || profile.lab_members?.[0]?.role || 'lab_viewer');
         setEditLabId(profile.lab_members?.[0]?.lab_id || '');
         setShowEditForm(true);
     };
@@ -205,13 +210,28 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                     )}
                                 </td>
                                 <td>
-                                    {profile.lab_members && profile.lab_members.length > 0 ? (
-                                        <span className="badge badge-info">
-                                            {t(`roles.${profile.lab_members[0].role}`)}
-                                        </span>
-                                    ) : (
-                                        <span className="badge badge-gray">-</span>
-                                    )}
+                                    {(() => {
+                                        const displayRole = profile.role || profile.lab_members?.[0]?.role;
+                                        if (!displayRole || displayRole === 'viewer') return <span className="badge badge-gray">-</span>;
+                                        const roleLabels: Record<string, string> = {
+                                            super_admin: 'Super Administrator',
+                                            lab_admin: 'Lab Admin',
+                                            lab_uploader: 'Document Uploader',
+                                            lab_viewer: 'Lab Viewer',
+                                            reviewer: 'Reviewer',
+                                            tecnico: 'Técnico Regulatorio',
+                                        };
+                                        const roleColors: Record<string, string> = {
+                                            super_admin: 'bg-purple-100 text-purple-700 border border-purple-200',
+                                            tecnico: 'bg-teal-100 text-teal-700 border border-teal-200',
+                                            reviewer: 'bg-blue-100 text-blue-700 border border-blue-200',
+                                        };
+                                        return (
+                                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${roleColors[displayRole] || 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                                                {roleLabels[displayRole] || displayRole}
+                                            </span>
+                                        );
+                                    })()}
                                 </td>
                                 <td className="text-sm text-gray-600">
                                     {new Date(profile.created_at).toLocaleDateString('es-ES')}
@@ -283,6 +303,14 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                         <div className="ml-3">
                                             <span className="block text-sm font-medium text-gray-900">Usuario del Laboratorio</span>
                                             <span className="block text-xs text-gray-500">Pertenece a una empresa específica (Admin, Editor, Lector)</span>
+                                        </div>
+                                    </label>
+
+                                    <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${userType === 'tecnico' ? 'bg-teal-50 border-teal-200 ring-1 ring-teal-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                                        <input type="radio" name="userType" value="tecnico" checked={userType === 'tecnico'} onChange={(e) => handleUserTypeChange(e.target.value)} className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300" />
+                                        <div className="ml-3">
+                                            <span className="block text-sm font-medium text-gray-900">Técnico Regulatorio</span>
+                                            <span className="block text-xs text-gray-500">Accede solo a los dossiers que le asigne el superadmin</span>
                                         </div>
                                     </label>
 
@@ -415,6 +443,7 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                         <option value="lab_viewer">Lector (Viewer)</option>
                                     </optgroup>
                                     <optgroup label="Externos">
+                                        <option value="tecnico">Técnico Regulatorio</option>
                                         <option value="reviewer">Revisor Externo (Reviewer)</option>
                                     </optgroup>
                                     <optgroup label="Sistema">
@@ -425,6 +454,7 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                     {editRole === 'lab_admin' && "Tiene acceso total a los datos de su laboratorio."}
                                     {editRole === 'lab_uploader' && "Puede subir documentos y ver reportes de su laboratorio."}
                                     {editRole === 'lab_viewer' && "Solo puede ver datos de su laboratorio, sin permisos de edición."}
+                                    {editRole === 'tecnico' && "Técnico regulatorio: accede solo a los dossiers que le asigna el superadmin."}
                                     {editRole === 'reviewer' && "Puede revisar y aprobar documentos de múltiples laboratorios asignados."}
                                     {editRole === 'super_admin' && "Tiene control total sobre toda la plataforma."}
                                 </p>

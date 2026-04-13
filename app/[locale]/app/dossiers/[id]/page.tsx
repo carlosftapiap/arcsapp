@@ -1,17 +1,21 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import DossierDetailClient from './DossierDetailClient';
-
-// Definir interfaces mínimas para el tipado interno si es necesario,
-// aunque Supabase devuelve tipos bastante útiles.
 
 export default async function DossierDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
     const supabase = await createClient();
+    // Admin client para bypassear RLS (técnicos no tienen lab_members)
+    const supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
 
-    // 1. Fetch Dossier
-    const { data: dossier, error: dossierError } = await supabase
+    // 1. Fetch Dossier (con admin para garantizar acceso)
+    const { data: dossier, error: dossierError } = await supabaseAdmin
         .from('dossiers')
         .select('*')
         .eq('id', id)
@@ -29,8 +33,8 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         );
     }
 
-    // 2. Fetch Dossier Items (Raw Data)
-    const { data: rawItems, error: itemsError } = await supabase
+    // 2. Fetch Dossier Items (Raw Data) - con admin para bypassear RLS
+    const { data: rawItems, error: itemsError } = await supabaseAdmin
         .from('dossier_items')
         .select(`
       id,
@@ -40,8 +44,8 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         id, code, module, title_i18n_json, required, critical, sort_order, allows_multiple_files
       ),
       documents:documents(
-        id, file_path, uploaded_at, version, status, uploaded_by,
-        profiles ( full_name ),
+        id, file_path, uploaded_at, version, status, uploaded_by, deleted_at, deleted_by, file_size,
+        profiles ( full_name, email ),
         ai_document_analyses (
           id, created_at, status, alerts, analysis_json
         ),
@@ -178,11 +182,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         // Manejo robusto de join único
         const checklistItem = Array.isArray(row.checklist_items) ? row.checklist_items[0] : row.checklist_items;
 
-        // Ordenar documentos en Javascript: Filtrar eliminados + (Versión Descendente > Fecha Descendente)
+        // Ordenar documentos: activos primero (Versión Desc > Fecha Desc), luego eliminados al final
         const documentsSorted = (row.documents || [])
-            .filter((d: any) => d.status !== 'deleted')
             .slice()
             .sort((a: any, b: any) => {
+                // Activos antes que eliminados
+                if (a.status === 'deleted' && b.status !== 'deleted') return 1;
+                if (a.status !== 'deleted' && b.status === 'deleted') return -1;
                 const vA = a.version || 0;
                 const vB = b.version || 0;
                 if (vA !== vB) return vB - vA; // Mayor versión primero
@@ -217,7 +223,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
             .eq('user_id', user.id)
             .single();
 
-        if (profileData?.role && ['reviewer', 'super_admin'].includes(profileData.role)) {
+        if (profileData?.role && ['reviewer', 'super_admin', 'tecnico'].includes(profileData.role)) {
             userRole = profileData.role;
         } else {
             // 2. Si no es revisor global, buscar rol en el laboratorio específico
@@ -297,5 +303,5 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
 
     console.log('📋 Resultado búsqueda auditoría:', previousAudit ? 'ENCONTRADA' : 'NO ENCONTRADA');
 
-    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} previousAudit={previousAudit} />;
+    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} userId={user?.id} previousAudit={previousAudit} />;
 }

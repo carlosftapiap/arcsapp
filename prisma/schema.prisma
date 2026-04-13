@@ -630,13 +630,14 @@ model dossiers {
   created_at      DateTime?         @default(now()) @db.Timestamptz(6)
   updated_at      DateTime?         @default(now()) @db.Timestamptz(6)
   product_id      String?           @db.Uuid
-  activity_log    activity_log[]
-  audits          audits[]
-  dossier_items   dossier_items[]
-  profiles        profiles?         @relation(fields: [created_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
-  labs            labs              @relation(fields: [lab_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  products        products?         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  extra_documents extra_documents[]
+  activity_log                   activity_log[]
+  audits                         audits[]
+  dossier_items                  dossier_items[]
+  dossier_technician_assignments dossier_technician_assignments[]
+  profiles                       profiles?         @relation(fields: [created_by], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  labs                           labs              @relation(fields: [lab_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products                       products?         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  extra_documents                extra_documents[]
 
   @@index([lab_id], map: "idx_dossiers_lab")
   @@index([product_id], map: "idx_dossiers_product")
@@ -784,11 +785,33 @@ model profiles {
   extra_documents          extra_documents[]
   extra_remarks            extra_remarks[]
   lab_members              lab_members[]
-  lab_reviewer_assignments lab_reviewer_assignments[]
-  users                    users                      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  remarks                  remarks[]
+  lab_reviewer_assignments                lab_reviewer_assignments[]
+  dossier_technician_assignments_received dossier_technician_assignments[] @relation("AssignedTo")
+  dossier_technician_assignments_given    dossier_technician_assignments[] @relation("AssignedBy")
+  users                                   users                            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  remarks                                 remarks[]
 
   @@index([email], map: "idx_profiles_email")
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model dossier_technician_assignments {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dossier_id  String    @db.Uuid
+  user_id     String    @db.Uuid
+  assigned_by String?   @db.Uuid
+  assigned_at DateTime? @default(now()) @db.Timestamptz(6)
+  active      Boolean?  @default(true)
+
+  dossiers         dossiers  @relation(fields: [dossier_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assigned_to_user profiles  @relation("AssignedTo", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  assigned_by_user profiles? @relation("AssignedBy", fields: [assigned_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([dossier_id, user_id])
+  @@index([dossier_id], map: "idx_dta_dossier")
+  @@index([user_id], map: "idx_dta_user")
+  @@index([active], map: "idx_dta_active")
   @@schema("public")
 }
 

@@ -87,6 +87,48 @@ export async function hasLabAccess(userId: string, labId: string) {
 }
 
 /**
+ * Devuelve los IDs de dossiers asignados a un técnico/revisor específico
+ * Usa el cliente admin para bypasear RLS y garantizar lecturas correctas
+ */
+export async function getUserAssignedDossierIds(userId: string): Promise<string[]> {
+    const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+    const adminClient = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data, error } = await adminClient
+        .from('dossier_technician_assignments')
+        .select('dossier_id')
+        .eq('user_id', userId)
+        .eq('active', true);
+
+    console.log('🔍 getUserAssignedDossierIds:', { userId, data, error });
+    return data?.map((r: any) => r.dossier_id) || [];
+}
+
+/**
+ * Verifica si un usuario está asignado a un dossier específico
+ */
+export async function isDossierAssigned(userId: string, dossierId: string): Promise<boolean> {
+    const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+    const adminClient = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data } = await adminClient
+        .from('dossier_technician_assignments')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('dossier_id', dossierId)
+        .eq('active', true)
+        .single();
+
+    return !!data;
+}
+
+/**
  * Obtiene todos los laboratorios a los que el usuario tiene acceso
  */
 export async function getUserLabs(userId: string) {
