@@ -92,7 +92,15 @@ export async function createUser(formData: FormData) {
     }
 }
 
-export async function updateUserRole(userId: string, newRole: string, newLabId?: string, activityLogEnabled?: boolean) {
+export async function updateUserRole(
+    userId: string,
+    newRole: string,
+    newLabId?: string,
+    activityLogEnabled?: boolean,
+    canUpload?: boolean,
+    canDownload?: boolean,
+    canView?: boolean
+) {
     try {
         // 1. SIEMPRE actualizar el rol en profiles (tabla principal de roles)
         const { error: profileError } = await supabaseAdmin
@@ -100,19 +108,24 @@ export async function updateUserRole(userId: string, newRole: string, newLabId?:
             .update({
                 role: newRole,
                 updated_at: new Date().toISOString(),
-                ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled })
+                ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled }),
+                ...(canUpload !== undefined && { can_upload_documents: canUpload }),
+                ...(canDownload !== undefined && { can_download_documents: canDownload }),
+                ...(canView !== undefined && { can_view_documents: canView }),
             })
             .eq('user_id', userId);
 
         if (profileError) {
             console.error('Error updating profile role:', profileError);
-            // Si no existe el profile, intentar con 'id' en lugar de 'user_id'
             const { error: profileError2 } = await supabaseAdmin
                 .from('profiles')
                 .update({
                     role: newRole,
                     updated_at: new Date().toISOString(),
-                    ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled })
+                    ...(activityLogEnabled !== undefined && { activity_log_enabled: activityLogEnabled }),
+                    ...(canUpload !== undefined && { can_upload_documents: canUpload }),
+                    ...(canDownload !== undefined && { can_download_documents: canDownload }),
+                    ...(canView !== undefined && { can_view_documents: canView }),
                 })
                 .eq('id', userId);
 

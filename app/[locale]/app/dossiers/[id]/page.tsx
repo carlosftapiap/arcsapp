@@ -14,12 +14,11 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // 1. Fetch Dossier (con admin para garantizar acceso)
-    const { data: dossier, error: dossierError } = await supabaseAdmin
-        .from('dossiers')
-        .select('*')
-        .eq('id', id)
-        .single();
+    // 1. Fetch Dossier y Usuario en PARALELO
+    const [{ data: dossier, error: dossierError }, { data: { user } }] = await Promise.all([
+        supabaseAdmin.from('dossiers').select('*').eq('id', id).single(),
+        supabase.auth.getUser(),
+    ]);
 
     if (dossierError || !dossier) {
         return (
@@ -217,103 +216,63 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         return orderA - orderB;
     });
 
-    // 5. Determinar Rol del Usuario
-    const { data: { user } } = await supabase.auth.getUser();
+    // 5. Determinar Rol del Usuario y buscar auditorías en PARALELO
+    const auditSelect = 'id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms';
+    const productKeyword = dossier.product_name?.split(' ')[0] || '';
+
+    const [profileResult, auditByIdResult, auditByNameResult, auditByLabResult] = await Promise.all([
+        user ? supabase.from('profiles').select('role, activity_log_enabled, can_upload_documents, can_download_documents, can_view_documents').eq('user_id', user.id).single() : Promise.resolve({ data: null }),
+        dossier.product_id
+            ? supabase.from('audits').select(auditSelect).eq('product_id', dossier.product_id).order('created_at', { ascending: false }).limit(1).single()
+            : Promise.resolve({ data: null }),
+        productKeyword
+            ? supabase.from('audits').select(auditSelect).ilike('product_name', `%${productKeyword}%`).order('created_at', { ascending: false }).limit(1).single()
+            : Promise.resolve({ data: null }),
+        (dossier.lab_id && productKeyword)
+            ? supabase.from('audits').select(auditSelect).eq('lab_id', dossier.lab_id).ilike('product_name', `%${productKeyword}%`).order('created_at', { ascending: false }).limit(1).single()
+            : Promise.resolve({ data: null }),
+    ]);
+
     let userRole = 'lab_viewer';
     let activityLogEnabled = true;
+    let canUploadDocuments = false;
+    let canDownloadDocuments = true;
+    let canViewDocuments = true;
 
     if (user) {
-        // 1. Primero verificar rol global en profiles (para reviewer y super_admin globales)
-        const { data: profileData } = await supabase
-            .from('profiles')
-            .select('role, activity_log_enabled')
-            .eq('user_id', user.id)
-            .single();
-
+        const profileData = profileResult.data;
         if (profileData) {
-            if (profileData.activity_log_enabled !== undefined) {
-                activityLogEnabled = profileData.activity_log_enabled;
-            }
+            if (profileData.activity_log_enabled !== undefined) activityLogEnabled = profileData.activity_log_enabled;
+            if (profileData.can_upload_documents !== undefined) canUploadDocuments = profileData.can_upload_documents;
+            if (profileData.can_download_documents !== undefined) canDownloadDocuments = profileData.can_download_documents;
+            if (profileData.can_view_documents !== undefined) canViewDocuments = profileData.can_view_documents;
             if (profileData.role && ['reviewer', 'super_admin', 'tecnico'].includes(profileData.role)) {
                 userRole = profileData.role;
             }
         } else {
-            // 2. Si no es revisor global, buscar rol en el laboratorio específico
+            // Fallback: buscar rol en lab específico
             const { data: memberData } = await supabase
                 .from('lab_members')
                 .select('role')
                 .eq('lab_id', dossier.lab_id)
                 .eq('user_id', user.id)
                 .single();
-
             if (memberData?.role) userRole = memberData.role;
         }
-
-        // Override manual para admin principal
         if (user.email === 'admin@arcsapp.com') userRole = 'super_admin';
     }
 
-    console.log('🔑 User role determined:', { userId: user?.id, userRole });
+    const previousAudit = auditByIdResult.data || auditByNameResult.data || auditByLabResult.data || null;
 
-    // 6. Buscar auditorías previas del producto (múltiples estrategias)
-    let previousAudit = null;
-
-    console.log('🔍 Buscando auditoría para dossier:', {
-        product_id: dossier.product_id,
-        product_name: dossier.product_name,
-        lab_id: dossier.lab_id
-    });
-
-    // Estrategia 1: Buscar por product_id si existe
-    if (dossier.product_id) {
-        const { data: auditData } = await supabase
-            .from('audits')
-            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
-            .eq('product_id', dossier.product_id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (auditData) {
-            previousAudit = auditData;
-            console.log('📋 Auditoría encontrada por product_id:', auditData.id);
-        }
-    }
-
-    // Estrategia 2: Buscar por nombre del producto (coincidencia parcial)
-    if (!previousAudit && dossier.product_name) {
-        const { data: auditByName } = await supabase
-            .from('audits')
-            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
-            .ilike('product_name', `%${dossier.product_name.split(' ')[0]}%`)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (auditByName) {
-            previousAudit = auditByName;
-            console.log('📋 Auditoría encontrada por nombre:', auditByName.id);
-        }
-    }
-
-    // Estrategia 3: Buscar por lab_id Y nombre del producto (más específico)
-    if (!previousAudit && dossier.lab_id && dossier.product_name) {
-        const { data: auditByLabAndName } = await supabase
-            .from('audits')
-            .select('id, product_name, manufacturer, total_pages, stages_found, stages_missing, problems_found, summary, created_at, processing_time_ms')
-            .eq('lab_id', dossier.lab_id)
-            .ilike('product_name', `%${dossier.product_name.split(' ')[0]}%`)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (auditByLabAndName) {
-            previousAudit = auditByLabAndName;
-            console.log('📋 Auditoría encontrada por lab_id + nombre:', auditByLabAndName.id);
-        }
-    }
-
-    console.log('📋 Resultado búsqueda auditoría:', previousAudit ? 'ENCONTRADA' : 'NO ENCONTRADA');
-
-    return <DossierDetailClient dossier={dossier} initialItems={items} userRole={userRole} userId={user?.id} previousAudit={previousAudit} activityLogEnabled={activityLogEnabled} />;
+    return <DossierDetailClient
+        dossier={dossier}
+        initialItems={items}
+        userRole={userRole}
+        userId={user?.id}
+        previousAudit={previousAudit}
+        activityLogEnabled={activityLogEnabled}
+        canUploadDocuments={canUploadDocuments}
+        canDownloadDocuments={canDownloadDocuments}
+        canViewDocuments={canViewDocuments}
+    />;
 }

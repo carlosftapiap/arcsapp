@@ -104,6 +104,9 @@ interface Props {
     userId?: string;
     previousAudit?: PreviousAudit | null;
     activityLogEnabled?: boolean;
+    canUploadDocuments?: boolean;
+    canDownloadDocuments?: boolean;
+    canViewDocuments?: boolean;
 }
 
 // Helper: Colores por módulo (tonos más fuertes)
@@ -263,7 +266,7 @@ function getOptionalTranslation(t: any, key: string): string | null {
 }
 
 
-export default function DossierDetailClient({ dossier, initialItems, userRole, userId, previousAudit, activityLogEnabled = true }: Props) {
+export default function DossierDetailClient({ dossier, initialItems, userRole, userId, previousAudit, activityLogEnabled = true, canUploadDocuments = false, canDownloadDocuments = true, canViewDocuments = true }: Props) {
     console.log("Rendering DossierDetailClient Clean Reconstruction");
     const t = useTranslations();
     const locale = useLocale();
@@ -284,10 +287,15 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
     const [labCommentText, setLabCommentText] = useState('');
     const [savingLabComment, setSavingLabComment] = useState(false);
 
-    // Permisos
+    // Permisos — rol base + permisos granulares del admin
     const isSuperAdmin = userRole === 'super_admin';
     const isReviewer = ['reviewer', 'lab_admin', 'super_admin'].includes(userRole);
-    const isUploader = ['lab_uploader', 'lab_admin', 'super_admin'].includes(userRole);
+    // isUploader: roles con acceso nativo O permiso explícito otorgado por admin (incluye técnico)
+    const isUploader = ['lab_uploader', 'lab_admin', 'super_admin', 'tecnico'].includes(userRole) || canUploadDocuments;
+    // isDownloader: roles con acceso nativo O permiso explícito
+    const isDownloader = ['lab_uploader', 'lab_admin', 'super_admin', 'reviewer', 'tecnico', 'lab_viewer'].includes(userRole) || canDownloadDocuments;
+    // isViewer: permiso para previsualizar documentos
+    const isViewer = ['lab_uploader', 'lab_admin', 'super_admin', 'reviewer', 'tecnico', 'lab_viewer'].includes(userRole) || canViewDocuments;
 
     // DEBUG: Ver qué llega
     console.log("DossierDetailClient items:", items);
@@ -1221,7 +1229,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                                         )}
                                                                     </h4>
                                                                     {/* Botón Agregar para multi-archivo */}
-                                                                    {checkItem.allows_multiple_files && isUploader && item.status !== 'approved' && (
+                                                                    {checkItem.allows_multiple_files && isUploader && (item.status !== 'approved' || isSuperAdmin) && (
                                                                         <>
                                                                             <input
                                                                                 type="file"
@@ -1262,7 +1270,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                                                     {checkItem.allows_multiple_files ? `Archivo ${docIndex + 1}` : `Versión ${doc.version}`} • {new Date(doc.uploaded_at).toLocaleDateString()} • {doc.profiles?.full_name || 'Usuario'}
                                                                                 </p>
                                                                                 <div className="flex flex-wrap gap-2 mt-2">
-                                                                                    {!isDeleted && (
+                                                                                    {!isDeleted && isViewer && (
                                                                                         <button
                                                                                             onClick={() => handlePreview(doc.file_path)}
                                                                                             className="text-xs btn-secondary py-1 px-2 flex items-center gap-1 bg-blue-50 text-blue-600 hover:bg-blue-100"
@@ -1271,8 +1279,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                                                             <Eye size={12} />
                                                                                         </button>
                                                                                     )}
-                                                                                    {/* Descarga: activos siempre, eliminados solo para superadmin */}
-                                                                                    {(!isDeleted || isSuperAdmin) && (
+                                                                                    {/* Descarga: activos con permiso, eliminados solo para superadmin */}
+                                                                                    {((!isDeleted && isDownloader) || (isDeleted && isSuperAdmin)) && (
                                                                                         <button
                                                                                             onClick={() => handleDownload(doc.file_path, doc.file_path.split('/').pop() || 'download')}
                                                                                             className="text-xs btn-secondary py-1 px-2 flex items-center gap-1"
@@ -1282,7 +1290,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                                                         </button>
                                                                                     )}
                                                                                     {/* Reemplazar solo para items de archivo único activos */}
-                                                                                    {!isDeleted && !checkItem.allows_multiple_files && isUploader && item.status !== 'approved' && (
+                                                                                    {!isDeleted && !checkItem.allows_multiple_files && isUploader && (item.status !== 'approved' || isSuperAdmin) && (
                                                                                         <>
                                                                                             <input type="file" id={`reupload-${item.id}`} className="hidden" accept=".pdf,.doc,.docx,.zip" onChange={(e) => handleFileUpload(e, item.id)} disabled={uploadingItemId === item.id} />
                                                                                             <label htmlFor={`reupload-${item.id}`} className="text-xs btn-secondary py-1 px-2 flex items-center gap-1 cursor-pointer text-blue-600 hover:bg-blue-50">

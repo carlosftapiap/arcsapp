@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Users as UsersIcon, Lock, User, Mail, Building2, UserCog, UserPlus, Edit, Trash2, Activity } from 'lucide-react';
+import { Plus, Users as UsersIcon, Lock, User, Mail, Building2, UserCog, UserPlus, Edit, Trash2, Activity, Upload, Download, Eye } from 'lucide-react';
 import { createUser, updateUserRole, deleteUser } from '@/app/[locale]/app/usuarios/actions';
 
 interface Lab {
@@ -18,6 +18,9 @@ interface Profile {
     created_at: string;
     role?: string;
     activity_log_enabled?: boolean;
+    can_upload_documents?: boolean;
+    can_download_documents?: boolean;
+    can_view_documents?: boolean;
     lab_members: Array<{
         lab_id: string;
         role: string;
@@ -43,6 +46,9 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
     const [editRole, setEditRole] = useState('');
     const [editLabId, setEditLabId] = useState('');
     const [editActivityLog, setEditActivityLog] = useState(true);
+    const [editCanUpload, setEditCanUpload] = useState(false);
+    const [editCanDownload, setEditCanDownload] = useState(true);
+    const [editCanView, setEditCanView] = useState(true);
     const [saving, setSaving] = useState(false);
 
     // Form States
@@ -76,7 +82,10 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
         setEditingUser(profile);
         setEditRole(profile.role || profile.lab_members?.[0]?.role || 'lab_viewer');
         setEditLabId(profile.lab_members?.[0]?.lab_id || '');
-        setEditActivityLog(profile.activity_log_enabled !== false); // default true
+        setEditActivityLog(profile.activity_log_enabled !== false);
+        setEditCanUpload(profile.can_upload_documents === true);
+        setEditCanDownload(profile.can_download_documents !== false);
+        setEditCanView(profile.can_view_documents !== false);
         setShowEditForm(true);
     };
 
@@ -86,7 +95,7 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
         setSaving(true);
 
         try {
-            const result = await updateUserRole(editingUser.user_id, editRole, editLabId || undefined, editActivityLog);
+            const result = await updateUserRole(editingUser.user_id, editRole, editLabId || undefined, editActivityLog, editCanUpload, editCanDownload, editCanView);
             if (result.error) {
                 alert("Error al actualizar: " + result.error);
             } else {
@@ -462,28 +471,72 @@ export default function UsersClient({ initialProfiles, labs }: Props) {
                                 </p>
                             </div>
 
-                            {/* Activity Log Permission */}
+                            {/* Permisos Adicionales */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-800 mb-2">Permisos Adicionales</label>
-                                <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editActivityLog ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${editActivityLog ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
-                                            <Activity size={20} />
+                                <div className="space-y-2">
+
+                                    {/* Toggle: Subir Documentos */}
+                                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editCanUpload ? 'bg-green-50 border-green-200 ring-1 ring-green-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${editCanUpload ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}><Upload size={18} /></div>
+                                            <div>
+                                                <span className={`block text-sm font-medium ${editCanUpload ? 'text-green-900' : 'text-gray-700'}`}>Subir Documentos</span>
+                                                <span className="block text-xs text-gray-500">Puede cargar archivos en los dossiers asignados.</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <span className={`block text-sm font-medium ${editActivityLog ? 'text-indigo-900' : 'text-gray-700'}`}>
-                                                Log de Actividades
-                                            </span>
-                                            <span className="block text-xs text-gray-500">
-                                                Registrar las acciones de este usuario en la auditoría del sistema.
-                                            </span>
+                                        <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${editCanUpload ? 'bg-green-600' : 'bg-gray-200'}`}>
+                                            <input type="checkbox" className="sr-only" checked={editCanUpload} onChange={(e) => setEditCanUpload(e.target.checked)} />
+                                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editCanUpload ? 'translate-x-5' : 'translate-x-0'}`} />
                                         </div>
-                                    </div>
-                                    <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${editActivityLog ? 'bg-indigo-600' : 'bg-gray-200'}`}>
-                                        <input type="checkbox" className="sr-only" checked={editActivityLog} onChange={(e) => setEditActivityLog(e.target.checked)} />
-                                        <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editActivityLog ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </div>
-                                </label>
+                                    </label>
+
+                                    {/* Toggle: Descargar Documentos */}
+                                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editCanDownload ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${editCanDownload ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-500'}`}><Download size={18} /></div>
+                                            <div>
+                                                <span className={`block text-sm font-medium ${editCanDownload ? 'text-blue-900' : 'text-gray-700'}`}>Descargar Documentos</span>
+                                                <span className="block text-xs text-gray-500">Puede descargar archivos de los dossiers.</span>
+                                            </div>
+                                        </div>
+                                        <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${editCanDownload ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                                            <input type="checkbox" className="sr-only" checked={editCanDownload} onChange={(e) => setEditCanDownload(e.target.checked)} />
+                                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editCanDownload ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </label>
+
+                                    {/* Toggle: Ver / Observar */}
+                                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editCanView ? 'bg-purple-50 border-purple-200 ring-1 ring-purple-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${editCanView ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-500'}`}><Eye size={18} /></div>
+                                            <div>
+                                                <span className={`block text-sm font-medium ${editCanView ? 'text-purple-900' : 'text-gray-700'}`}>Ver / Observar Documentos</span>
+                                                <span className="block text-xs text-gray-500">Puede visualizar y previsualizar documentos.</span>
+                                            </div>
+                                        </div>
+                                        <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${editCanView ? 'bg-purple-600' : 'bg-gray-200'}`}>
+                                            <input type="checkbox" className="sr-only" checked={editCanView} onChange={(e) => setEditCanView(e.target.checked)} />
+                                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editCanView ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </label>
+
+                                    {/* Toggle: Log de Actividades */}
+                                    <label className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${editActivityLog ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-300' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${editActivityLog ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}><Activity size={18} /></div>
+                                            <div>
+                                                <span className={`block text-sm font-medium ${editActivityLog ? 'text-indigo-900' : 'text-gray-700'}`}>Log de Actividades</span>
+                                                <span className="block text-xs text-gray-500">Registrar las acciones en la auditoría del sistema.</span>
+                                            </div>
+                                        </div>
+                                        <div className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${editActivityLog ? 'bg-indigo-600' : 'bg-gray-200'}`}>
+                                            <input type="checkbox" className="sr-only" checked={editActivityLog} onChange={(e) => setEditActivityLog(e.target.checked)} />
+                                            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${editActivityLog ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </div>
+                                    </label>
+
+                                </div>
                             </div>
 
                             <div className="flex gap-3 pt-4 border-t border-gray-100">

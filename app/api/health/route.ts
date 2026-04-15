@@ -19,10 +19,8 @@ export async function GET(request: NextRequest) {
 
   // Check database connection
   try {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = (await import('@/lib/prisma')).default;
     await prisma.$queryRaw`SELECT 1`;
-    await prisma.$disconnect();
     health.checks.database = 'ok';
   } catch (error: any) {
     health.checks.database = `error: ${error.message}`;
@@ -36,7 +34,8 @@ export async function GET(request: NextRequest) {
     if (supabaseUrl) {
       const response = await fetch(`${supabaseUrl}/rest/v1/`, {
         headers: {
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ''}`,
         }
       });
       health.checks.supabase = response.ok ? 'ok' : `error: ${response.status}`;
