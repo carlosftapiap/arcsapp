@@ -13,7 +13,7 @@ interface DocVersion {
     deleted_at?: string | null;
     deleted_by?: string | null;
     file_size?: number | null;
-    profiles?: { full_name: string; email: string } | null;
+    profiles?: { full_name: string; email?: string } | null;
 }
 
 interface Props {

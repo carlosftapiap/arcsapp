@@ -46,7 +46,7 @@ interface Document {
     uploaded_at: string;
     status: string;
     uploaded_by?: string;
-    profiles?: { full_name: string };
+    profiles?: { full_name: string; email?: string };
     ai_document_analyses?: AIAnalysis[];
     technical_reviews?: TechnicalReview[];
 }
@@ -243,24 +243,30 @@ function formatAnalysisToText(data: any, t: (key: string) => string): string {
 }
 
 
-// Helper para obtener traducciones opcionales sin errores de consola
+// Helper para obtener traducciones opcionales sin errores de consola / overlays de desarrollo
 function getOptionalTranslation(t: any, key: string): string | null {
-    // Prefijos de códigos que sabemos que NO tienen traducciones en stageInstructions
-    const knownUntranslatedPrefixes = ['LEG-', 'PRO-', 'REG-', 'MKT-', 'LOG-', 'FIN-', 'F-', 'DM-', 'BIO-', 'NEW-'];
+    // Prefijos de códigos que sabemos que NO suelen tener traducciones en stageInstructions
+    const knownUntranslatedPrefixes = [
+        'LEG-', 'PRO-', 'REG-', 'MKT-', 'LOG-', 'FIN-', 'F-', 
+        'DM-', 'BIO-', 'NEW-', 'QA-', 'QC-', 'PV-', 'RA-'
+    ];
 
-    // Si la key contiene alguno de los prefijos conocidos, no intentar traducir
-    if (knownUntranslatedPrefixes.some(prefix => key.includes(prefix))) {
+    // Si la key contiene alguno de los prefijos conocidos o caracteres inesperados, no intentar traducir
+    const stageCode = key.split('.')[1] || '';
+    if (knownUntranslatedPrefixes.some(prefix => stageCode.startsWith(prefix))) {
         return null;
     }
 
     try {
+        // En next-intl, t() puede arrojar error o retornar la key si falta el mensaje
         const result = t(key);
-        // Si la traducción devuelve la misma key, significa que no existe
-        if (result && !result.includes(key.split('.')[0])) {
+        
+        // Verificación doble: si el resultado es igual a la key completa o contiene partes de la key devueltas como fallback
+        if (result && result !== key && !result.includes('stageInstructions.')) {
             return result;
         }
     } catch (e) {
-        // Ignorar silenciosamente
+        // Captura errores si el entorno es muy estricto
     }
     return null;
 }
@@ -357,7 +363,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                 
                 // Enviar notificación por email
                 const itemTarget = items.find(i => i.id === itemId);
-                const sectionName = itemTarget?.checklist_item ? `${itemTarget.checklist_item.code} - ${itemTarget.checklist_item.name_es || itemTarget.checklist_item.name || 'Requisito'}` : 'Requisito General';
+                const sectionName = itemTarget?.checklist_item ? `${itemTarget.checklist_item.code} - ${(itemTarget.checklist_item as any).name_es || (itemTarget.checklist_item as any).name || itemTarget.checklist_item.title_i18n_json?.es || 'Requisito'}` : 'Requisito General';
                 notifyCommentAdded(dossier.product_name, labCommentText, 'Usuario', sectionName);
                 
                 setLabCommentText('');
@@ -498,7 +504,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
             
             // Enviar notificación por email
             const fileName = files.length > 1 ? `${files.length} archivos` : files[0].name;
-            const secName = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${currentItem.checklist_item.name_es || currentItem.checklist_item.name || 'Requisito'}` : 'Requisito General';
+            const secName = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${(currentItem.checklist_item as any).name_es || (currentItem.checklist_item as any).name || currentItem.checklist_item.title_i18n_json?.es || 'Requisito'}` : 'Requisito General';
             notifyDocumentUploaded(fileName, dossier.product_name, 'Usuario', secName);
 
         } catch (error: any) {
@@ -635,7 +641,7 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
             
             // Enviar notificación por email
             const fileName = filePath.split('/').pop() || 'Documento';
-            const secNameDelete = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${currentItem.checklist_item.name_es || currentItem.checklist_item.name || 'Requisito'}` : 'Requisito General';
+            const secNameDelete = currentItem?.checklist_item ? `${currentItem.checklist_item.code} - ${(currentItem.checklist_item as any).name_es || (currentItem.checklist_item as any).name || currentItem.checklist_item.title_i18n_json?.es || 'Requisito'}` : 'Requisito General';
             notifyDocumentDeleted(fileName, dossier.product_name, 'Usuario', secNameDelete);
         } catch (error: any) {
             alert('Error al eliminar: ' + error.message);
@@ -1028,6 +1034,19 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                         {statusBadges}
                                                     </div>
                                                     <h3 className="text-gray-900 font-medium text-sm">{(checkItem.title_i18n_json as any)?.[locale] || checkItem.title_i18n_json?.es || checkItem.code}</h3>
+                                                    {/* Criterios de evaluación SIEMPRE VISIBLES en la fila colapsada */}
+                                                    {(() => {
+                                                        const evaluates = getOptionalTranslation(t, `stageInstructions.${checkItem.code.replace(/\./g, '-')}.evaluates`);
+                                                        if (!evaluates) return null;
+                                                        return (
+                                                            <div className="mt-2 flex items-start gap-1.5 bg-amber-50 border border-amber-300 rounded-md px-2 py-1.5 shadow-sm">
+                                                                <span className="text-amber-500 text-xs mt-0.5 flex-shrink-0">🎯</span>
+                                                                <p className="text-[11px] font-semibold text-amber-800 leading-snug whitespace-pre-line">
+                                                                    {evaluates}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 {/* Botón candado */}
                                                 {hasDoc && canLockItem && (
@@ -1056,8 +1075,8 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                             {isExpanded && (
                                                 <div className="px-4 pb-6 bg-gray-50 border-t border-gray-100 animate-in slide-in-from-top-1">
 
-                                                    {/* Instrucciones de la etapa - Solo visible para super_admin y usuarios del laboratorio */}
-                                                    {['super_admin', 'lab_admin', 'lab_uploader', 'lab_viewer'].includes(userRole) && (
+                                                    {/* Instrucciones de la etapa - Visible para TODOS los usuarios */}
+                                                    {(
                                                         <div className="mt-3 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                                             <p className="text-sm text-blue-800">
                                                                 <span className="font-medium">📋 </span>
@@ -1070,20 +1089,27 @@ export default function DossierDetailClient({ dossier, initialItems, userRole, u
                                                                     return description || 'Suba el documento correspondiente a este requisito.';
                                                                 })()}
                                                             </p>
-                                                            {/* multiHint deshabilitado temporalmente - solo items específicos lo tienen */}
-                                                            {/* Criterios de evaluación */}
+                                                            {/* Criterios de evaluación - SIEMPRE VISIBLE para todos los usuarios */}
                                                             {(() => {
                                                                 const evaluates = getOptionalTranslation(t, `stageInstructions.${checkItem.code.replace(/\./g, '-')}.evaluates`);
                                                                 if (evaluates) {
                                                                     return (
-                                                                        <details className="mt-3 border-t border-blue-200 pt-2">
-                                                                            <summary className="text-xs font-medium text-blue-900 cursor-pointer hover:text-blue-700">
-                                                                                🔍 {t('dossiers.detail.viewEvaluationCriteria')}
-                                                                            </summary>
-                                                                            <div className="mt-2 text-xs text-blue-800 whitespace-pre-line bg-blue-100/50 p-2 rounded">
-                                                                                {evaluates}
+                                                                        <div className="mt-3 border-t-2 border-amber-300 pt-3">
+                                                                            <div className="flex items-center gap-2 mb-2">
+                                                                                <span className="text-base">🎯</span>
+                                                                                <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                                                                                    {t('dossiers.detail.viewEvaluationCriteria')}
+                                                                                </span>
+                                                                                <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                                                                    Obligatorio
+                                                                                </span>
                                                                             </div>
-                                                                        </details>
+                                                                            <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 shadow-sm">
+                                                                                <p className="text-xs font-semibold text-amber-900 whitespace-pre-line leading-relaxed">
+                                                                                    {evaluates}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
                                                                     );
                                                                 }
                                                                 return null;

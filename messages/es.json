@@ -291,7 +291,7 @@
             "title": "Desarrollo y Fabricación",
             "hint": "Suba el documento de desarrollo del producto (puede ser un solo archivo consolidado o varios archivos). El documento debe contener: Descripción del Producto, Proceso de Fabricación, Fórmula Cuali-Cuantitativa, Controles en Proceso (IPC), Flujograma y Overages/Pérdidas si aplica.",
             "multiHint": " Puede subir uno o varios archivos. El contenido debe incluir:\n• Descripción física, química y farmacéutica del producto\n• Proceso de fabricación paso a paso\n• Fórmula con APIs y excipientes\n• Controles en proceso (IPC)\n• Flujograma de proceso\n• Justificación de overages (si aplica)",
-            "evaluates": " LA IA VALIDARÁ:\n\n DESCRIPCIÓN DEL PRODUCTO:\n• Descripción física (color, forma, olor)\n• Características químicas y farmacéuticas\n\n PROCESO DE FABRICACIÓN:\n• Secuencia completa de operaciones\n• Parámetros críticos (tiempo, temperatura)\n• Equipos utilizados\n\n FÓRMULA CUALI-CUANTITATIVA:\n• Todos los APIs con cantidades exactas\n• Todos los excipientes con función declarada\n• Colorantes y conservantes\n\n CONTROLES EN PROCESO (IPC):\n• Puntos de control definidos\n• Límites de aceptación\n• Frecuencia de muestreo\n\n FLUJOGRAMA:\n• Representación visual clara del proceso\n• Todas las etapas incluidas\n• Puntos de control marcados\n\n OVERAGES / PÉRDIDAS (si aplica):\n• Justificación técnica del overage\n• Cálculos de compensación\n\n COHERENCIA GENERAL:\n• Trazabilidad entre todos los elementos\n• Consistencia de datos entre secciones"
+            "evaluates": " EL TÉCNICO VALIDARÁ:\n\n DESCRIPCIÓN DEL PRODUCTO:\n• Descripción física (color, forma, olor)\n• Características químicas y farmacéuticas\n\n PROCESO DE FABRICACIÓN:\n• Secuencia completa de operaciones\n• Parámetros críticos (tiempo, temperatura)\n• Equipos utilizados\n\n FÓRMULA CUALI-CUANTITATIVA:\n• Todos los APIs con cantidades exactas\n• Todos los excipientes con función declarada\n• Colorantes y conservantes\n\n CONTROLES EN PROCESO (IPC):\n• Puntos de control definidos\n• Límites de aceptación\n• Frecuencia de muestreo\n\n FLUJOGRAMA:\n• Representación visual clara del proceso\n• Todas las etapas incluidas\n• Puntos de control marcados\n\n OVERAGES / PÉRDIDAS (si aplica):\n• Justificación técnica del overage\n• Cálculos de compensación\n\n COHERENCIA GENERAL:\n• Trazabilidad entre todos los elementos\n• Consistencia de datos entre secciones"
         },
         "B-02": {
             "title": "CoA Materias Primas / API",
@@ -383,6 +383,11 @@
             "title": "Dictamen Técnico",
             "hint": "Suba el dictamen técnico o resolución oficial aprobada.",
             "evaluates": " SE EVALÚA:\n• Dictamen firmado\n• Conclusión oficial"
+        },
+        "E-02": {
+            "title": "Documentación Complementaria",
+            "hint": "Suba cualquier documento adicional que complemente el trámite.",
+            "evaluates": " SE EVALÚA:\n• Pertinencia del documento\n• Calidad de la información"
         }
     },
     "common": {

@@ -31,15 +31,17 @@ async function handleSignOut() {
             .eq('user_id', user.id)
             .single();
 
-        await supabaseAdmin.from('activity_log').insert({
-            actor_user_id: user.id,
-            event_type: 'user_logout',
-            payload_json: {
-                user_name: profile?.full_name || user.email,
-                user_email: profile?.email || user.email,
-                ip_address: ip,
-            }
-        }).catch(() => {});
+        try {
+            await supabaseAdmin.from('activity_log').insert({
+                actor_user_id: user.id,
+                event_type: 'user_logout',
+                payload_json: {
+                    user_name: profile?.full_name || user.email,
+                    user_email: profile?.email || user.email,
+                    ip_address: ip,
+                }
+            });
+        } catch {}
     }
 
     await supabase.auth.signOut();

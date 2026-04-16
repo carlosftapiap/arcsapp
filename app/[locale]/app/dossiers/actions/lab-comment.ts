@@ -41,7 +41,8 @@ export async function saveLabComment(
             .from('profiles')
             .select('full_name, role')
             .eq('user_id', user.id)
-            .single();
+            .limit(1)
+            .maybeSingle();
 
         let senderName = profile?.full_name || 'Usuario';
         let senderRole = profile?.role || 'lab_viewer';
@@ -53,7 +54,8 @@ export async function saveLabComment(
                 .select('role')
                 .eq('user_id', user.id)
                 .eq('lab_id', labId)
-                .single();
+                .limit(1)
+                .maybeSingle();
             if (member?.role) senderRole = member.role;
         }
 
@@ -62,7 +64,8 @@ export async function saveLabComment(
             .from('dossier_items')
             .select('lab_comment_json, dossier_id')
             .eq('id', dossierItemId)
-            .single();
+            .limit(1)
+            .maybeSingle();
 
         if (fetchError) throw fetchError;
 

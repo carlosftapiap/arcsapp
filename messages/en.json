@@ -359,6 +359,16 @@
             "title": "Additional Documentation",
             "hint": "Upload any additional required documentation.",
             "evaluates": " EVALUATED:\n• Complete documentation\n• Correct format\n• Relevant information"
+        },
+        "D-01": {
+            "title": "Technical Verdict",
+            "hint": "Upload the official approved technical verdict or resolution.",
+            "evaluates": " EVALUATED:\n• Signed verdict\n• Official conclusion"
+        },
+        "E-02": {
+            "title": "Complementary Documentation",
+            "hint": "Upload any additional document that complements the process.",
+            "evaluates": " EVALUATED:\n• Document relevance\n• Information quality"
         }
     },
     "common": {
